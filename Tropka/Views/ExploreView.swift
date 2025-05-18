@@ -1,69 +1,55 @@
 import SwiftUI
 
 struct ExploreView: View {
-    @StateObject private var vm = RoutesViewModel()
+    @StateObject private var vm = ExploreViewModel()
 
     var body: some View {
         NavigationView {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(vm.routes) { route in
-                        RouteCardView(route: route)
-                            .padding(.horizontal)
+            Group {
+                if vm.isLoading {
+                    ProgressView("Loading…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let msg = vm.errorMsg {
+                    ErrorBlock(message: msg) { vm.loadRoutes() }
+                } else {
+                    /// Обычный список «один-за-другим»
+                    ScrollView {
+                        LazyVStack(spacing: 24) {
+                            ForEach(vm.routes) { r in
+                                ExploreCard(route: r)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 32)   // нижний отступ
                     }
+                    .refreshable { vm.loadRoutes() }   // pull-to-refresh
                 }
-                .padding(.top)
             }
             .navigationTitle("Explore")
         }
-        .onAppear { vm.loadRoutes() }
+        .onAppear { if vm.routes.isEmpty { vm.loadRoutes() } }
     }
 }
 
-struct RouteCardView: View {
-    let route: Route
-
+private struct ErrorBlock: View {
+    let message: String
+    let retry: () -> Void
+    
     var body: some View {
-        HStack(spacing: 12) {
-            AsyncImage(url: route.thumbnailURL) { phase in
-                if let image = phase.image {
-                    image
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Color.gray.opacity(0.3)
-                }
-            }
-            .frame(width: 100, height: 100)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(route.title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                Text("by \(route.author)")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                HStack(spacing: 4) {
-                    Text("★ \(String(format: "%.1f", route.rating))")
-                    Text("•")
-                    Text(route.price == 0 ? "Free" : "€\(route.price!, specifier: "%.2f")")
-                }
-                .font(.caption)
-                .foregroundColor(.secondary)
-            }
-            Spacer()
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.largeTitle)
+                .foregroundColor(.orange)
+            
+            Text(message)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            Button("Retry", action: retry)
+                .buttonStyle(.borderedProminent)
         }
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(UIColor.secondarySystemBackground))
-        )
-    }
-}
-
-struct ExploreView_Previews: PreviewProvider {
-    static var previews: some View {
-        ExploreView()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

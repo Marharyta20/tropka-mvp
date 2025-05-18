@@ -1,38 +1,61 @@
-import FirebaseFirestore
+import Foundation
+import FirebaseFirestore              // Firestore + GeoPoint
+import Combine
+
+// ─────────────────────────────────────────────────────────────
+//  MARK: - View-model
+// ─────────────────────────────────────────────────────────────
 
 final class TourDetailsViewModel: ObservableObject {
-    @Published var stops: [Stop] = []
-    @Published var isLoading = false
 
+    // MARK: - Published state
+    @Published var stops:     [Stop] = []
+    @Published var isLoading: Bool   = false
+
+    // MARK: - Private
     private let db = Firestore.firestore()
 
-    func loadStops(for routeId: String) {
+    // MARK: - Public API
+    /// Loads all stops for a given route (sub-collection `/stops`)
+    func loadStops(for routeID: String) {
         isLoading = true
+
         db.collection("routes")
-          .document(routeId)
-          .collection("stops")
-          .order(by: "order")
-          .getDocuments { [weak self] snap, err in
-              DispatchQueue.main.async {
-                  self?.isLoading = false
-                  if let err = err { print("❌ stops error:", err); return }
+            .document(routeID)
+            .collection("stops")
+            .order(by: "orderIndex")                 // 🔑 important for correct order
+            .getDocuments { [weak self] snap, err in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.isLoading = false
 
-                  self?.stops = snap?.documents.compactMap { doc in
-                      let d = doc.data()
-                      guard
-                        let name  = d["name"]       as? String,
-                        let geo   = d["coordinates"] as? GeoPoint,
-                        let order = d["order"]      as? Int
-                      else { return nil }
+                    if let err = err {
+                        print("❌ Failed to fetch stops:", err)
+                        return
+                    }
 
-                      let photo = (d["photoURL"] as? String).flatMap(URL.init)
-                      return Stop(id: doc.documentID,
-                                  name: name,
-                                  coordinate: geo,
-                                  order: order,
-                                  photoURL: photo)
-                  } ?? []
-              }
-          }
+                    self.stops = snap?.documents.compactMap { doc -> Stop? in
+                        let d = doc.data()
+
+                        // mandatory fields
+                        guard
+                            let name       = d["name"]         as? String,
+                            let geo        = d["coordinates"]  as? GeoPoint,
+                            let order      = d["orderIndex"]   as? Int,
+                            let timeSpent  = d["timeSpent"]    as? Int
+                        else { return nil }
+
+                        // optional
+                        let photoURL = (d["photoURL"] as? String).flatMap(URL.init)
+
+                        return Stop(id:          doc.documentID,
+                                    name:        name,
+                                    coordinate:  geo,
+                                    order:       order,
+                                    timeSpent:   timeSpent,
+                                    photoURL:    photoURL)
+                    } ?? []
+                }
+            }
     }
 }

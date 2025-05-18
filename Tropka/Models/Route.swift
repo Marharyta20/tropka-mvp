@@ -1,16 +1,30 @@
 import Foundation
-import FirebaseFirestore
+import FirebaseFirestore   // for GeoPoint
 
-struct Route: Identifiable, Codable {
-  @DocumentID var id: String?
-  let title: String
-  let author: String
-  let rating: Double
-  let reviewCount: Int
-  let duration: Double   // in hours
-  let stops: [GeoPoint]
-  let tags: [String]
-  let price: Double?     // nil for free
-  let thumbnailURL: URL?
-  var isFree: Bool { price == nil }
+// MARK: - Route model (document in /routes)
+
+struct Route: Identifiable {
+    /// Firestore document ID (parsed manually)
+    let id: String
+
+    // Core fields
+    let title: String
+    let authorUID: String
+
+    // Ratings & meta
+    let rating: Double
+    let reviewCount: Int
+    let duration: Double          // hours
+
+    // Tags & pricing
+    let tags: [String]
+    let price: Double?            // nil → free
+
+    // Media
+    let thumbnailURL: URL?
+
+    // Convenience
+    var isFree: Bool { price == nil }
+    
+    let stopsCount: Int
 }

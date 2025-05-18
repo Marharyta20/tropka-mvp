@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseCore
+import FirebaseFirestore
 
 class AppDelegate: NSObject, UIApplicationDelegate {
   func application(
@@ -17,7 +18,8 @@ struct TropkaApp: App {
 
   var body: some Scene {
     WindowGroup {
-      ContentView()
+        ContentView()
+        //TestView()
     }
   }
 }

@@ -2,47 +2,50 @@ import Foundation
 import FirebaseFirestore
 
 final class FirestoreService {
-  static let shared = FirestoreService()
-  private let db = Firestore.firestore()
+    static let shared = FirestoreService()
+    private let db    = Firestore.firestore()
 
-  private init() {}
+    /// Загружаем public-маршруты (первые 50, отсортированы по createdAt)
+    func fetchExploreRoutes(
+        completion: @escaping (Result<[Route], Error>) -> Void
+    ) {
+        db.collection("routes")
+          .order(by: "createdAt", descending: true)
+          .limit(to: 50)
+          .getDocuments { snap, err in
 
-  /// Fetches all Route documents from the "routes" collection
-  /// and decodes them into your Route model.
-  func fetchRoutes(completion: @escaping ([Route]) -> Void) {
-    db.collection("routes")
-      .getDocuments { snapshot, error in
-        if let error = error {
-          print("⚠️ FirestoreService.fetchRoutes error:", error)
-          completion([])
-          return
-        }
-        let routes = snapshot?.documents.compactMap { doc in
-          try? doc.data(as: Route.self)
-        } ?? []
-        completion(routes)
-      }
-  }
+              if let err = err {
+                  completion(.failure(err)); return
+              }
 
-  /// Saves a Route under the current user's subcollection "users/{uid}/routes/{routeId}"
-  /// Throws if the Route.id is missing or if Firestore write fails.
-  func saveRoute(_ route: Route, forUID uid: String) async throws {
-    guard let id = route.id else {
-      throw NSError(
-        domain: "FirestoreService",
-        code: -1,
-        userInfo: [NSLocalizedDescriptionKey: "Route ID is nil"]
-      )
+              // ↘︎ вся «магия» парсинга в одной строке
+              let routes = snap?.documents.compactMap(Route.init(from:)) ?? []
+              completion(.success(routes))
+          }
     }
-    let ref = db
-      .collection("users")
-      .document(uid)
-      .collection("routes")
-      .document(id)
-    try ref.setData(from: route)
-  }
-
-  // You can add more methods here, e.g.:
-  // func fetchSavedRoutes(forUID uid: String, completion: @escaping ([Route]) -> Void) { … }
-  // func deleteRoute(_ routeID: String, forUID uid: String) async throws { … }
 }
+extension Route {
+    /// Удобный и *единственный* парсер: делает всю работу и не оставляет warning-ов
+    init?(from doc: QueryDocumentSnapshot) {
+        let d = doc.data()
+
+        // обязательные поля
+        guard let title  = d["title"]      as? String,
+              let author = d["authorUID"]  as? String else { return nil }
+
+        // всё остальное – опционально
+        self.init(
+            id:           doc.documentID,
+            title:        title,
+            authorUID:    author,
+            rating:       d["rating"]       as? Double ?? 0,
+            reviewCount:  d["reviewCount"]  as? Int    ?? 0,
+            duration:     d["duration"]     as? Double ?? 0,
+            tags:         d["tags"]         as? [String] ?? [],
+            price:        d["price"]        as? Double,          // nil → free
+            thumbnailURL: (d["thumbnailURL"] as? String).flatMap(URL.init),
+            stopsCount:   d["stopsCount"]   as? Int ?? 0
+        )
+    }
+}
+

@@ -1,117 +1,58 @@
 import SwiftUI
-import CoreLocation
-import MapboxMaps
+import MapboxMaps   // если потом будем рисовать мини-карту
 
 struct TourDetailsView: View {
-    let route: Route
-    @Binding var isPresented: Bool
+    let route: Route            // ваш Route без FirestoreSwift
+    @StateObject private var vm = TourDetailsViewModel()
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // MARK: — IMAGE SLIDER
-                    TabView {
-                        // In the future replace with real array of image URLs
-                        AsyncImage(url: route.thumbnailURL) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView()
-                                    .frame(maxWidth: .infinity, maxHeight: 200)
-                            case .failure:
-                                Image(systemName: "photo")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(maxWidth: .infinity, maxHeight: 200)
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(maxWidth: .infinity, maxHeight: 200)
-                                    .clipped()
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                        .frame(height: 200)
-                        .clipped()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // — thumbnail
+                if let url = route.thumbnailURL {
+                    AsyncImage(url: url) { img in
+                        img.resizable()
+                    } placeholder: {
+                        ProgressView()
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .always))
                     .frame(height: 200)
+                    .clipped()
+                }
 
-                    // MARK: — TITLE, AUTHOR, RATING & PRICE
-                    Text(route.title)
-                        .font(.title2).bold()
-                    Text("by \(route.author)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                // — основная инфо
+                Text(route.title).font(.title2).bold()
+                Text("by \(route.authorUID)").foregroundColor(.secondary)
 
-                    HStack(spacing: 8) {
-                        Label(String(format: "%.1f", route.rating),
-                              systemImage: "star.fill")
-                            .font(.caption)
-                        Text(route.isFree
-                             ? "Free"
-                             : String(format: "€%.2f", route.price ?? 0))
-                            .font(.caption)
-                    }
-                    .foregroundColor(.secondary)
-
-                    // MARK: — TAGS
-                    ScrollView(.horizontal, showsIndicators: false) {
+                // — список остановок (когда загрузятся)
+                if vm.isLoading {
+                    ProgressView().padding()
+                } else if vm.stops.isEmpty {
+                    Text("No stops yet").foregroundColor(.secondary)
+                } else {
+                    ForEach(vm.stops) { stop in
                         HStack {
-                            ForEach(route.tags, id: \.self) { tag in
-                                Text("#\(tag)")
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.gray.opacity(0.2))
-                                    .cornerRadius(8)
-                            }
+                            Text("\(stop.order). \(stop.name)")
+                            Spacer()
                         }
-                    }
-
-                    // MARK: — MAP
-                    // Display map with stops as pins
-                    if !route.stops.isEmpty {
-                        MapScreenView(
-                            stops: route.stops.map { geoPoint in
-                                CLLocationCoordinate2D(
-                                    latitude: geoPoint.latitude,
-                                    longitude: geoPoint.longitude
-                                )
-                            }
-                        )
-                        .frame(height: 300)
-                        .cornerRadius(12)
-                        .shadow(radius: 4)
-                    }
-
-                    // MARK: — ACTION BUTTON
-                    Button {
-                        // TODO: purchase or save logic
-                        isPresented = false
-                    } label: {
-                        Text(route.isFree
-                             ? "Save Route"
-                             : "Buy for \(String(format: "€%.2f", route.price ?? 0))")
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                            .background(Color.accentColor)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    }
-                    .padding(.top, 24)
-                }
-                .padding()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        isPresented = false
+                        .padding(.vertical, 4)
                     }
                 }
+
+                // — кнопка Save/Buy
+                Button(
+                    route.isFree
+                        ? "Save Route"
+                        : String(format: "Buy for €%.2f", route.price ?? 0)
+                ) {
+                    // TODO: save / buy logic
+                }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(8)
             }
+            .padding()
         }
+        .onAppear { vm.loadStops(for: route.id) }
     }
 }
