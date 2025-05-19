@@ -12,5 +12,3 @@ struct Stop: Identifiable {
     let photoURL: URL?
     let notes: String?
 }
-
-

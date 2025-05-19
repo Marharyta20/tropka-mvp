@@ -1,83 +1,102 @@
 import SwiftUI
 import MapboxMaps
-import FirebaseFirestore   // нужен для GeoPoint ➜ CLLocationCoordinate2D
+import CoreLocation
+import FirebaseFirestore
+import Turf
 
-/// Показывает карту с пинами и линией маршрута.
-/// Передаём stops через Binding, чтобы SwiftUI реагировал на изменения.
+extension GeoPoint {
+    var clCoord: CLLocationCoordinate2D {
+        .init(latitude: latitude,
+              longitude: longitude)
+    }
+}
+
 struct MapRepresentable: UIViewRepresentable {
 
-    @Binding var stops: [Stop]
+    // MARK: bindings для «наружи»
+    @Binding var mapView: MapView?
+    @Binding var pinManager: PointAnnotationManager?
+    @Binding var lineManager: PolylineAnnotationManager?
 
-    /// Ссылки наружу, чтобы RouteMapView могла двигать камеру и т. д.
-    @Binding var mapViewRef: MapView?
-    @Binding var pinManagerRef: PointAnnotationManager?
-    @Binding var lineManagerRef: PolylineAnnotationManager?
+    let stops: [Stop]
 
-    // MARK: - makeUIView
     func makeUIView(context: Context) -> MapView {
-        let options = MapInitOptions(styleURI: .streets)
-        let mapView = MapView(frame: .zero, mapInitOptions: options)
+        let opts = MapInitOptions(styleURI: .streets)
+        let mv = MapView(frame: .zero, mapInitOptions: opts)
 
-        // store reference outward
+        // сохраняем наружу
+        DispatchQueue.main.async { mapView = mv }
+
+        // менеджеры
+        let pins = mv.annotations.makePointAnnotationManager()
+        let lines = mv.annotations.makePolylineAnnotationManager()
         DispatchQueue.main.async {
-            mapViewRef = mapView
+            pinManager  = pins
+            lineManager = lines
         }
 
-        // 1️⃣ менеджеры аннотаций
-        pinManagerRef  = mapView.annotations.makePointAnnotationManager()
-        lineManagerRef = mapView.annotations.makePolylineAnnotationManager()
+        // рисуем точки + полилинию
+        addAnnotations(on: mv, pins: pins, line: lines)
 
-        // начальная заливка пинов (если stops уже есть)
-        updatePinsAndLine()
-
-        return mapView
+        return mv
     }
 
-    // MARK: - updateUIView
     func updateUIView(_ uiView: MapView, context: Context) {
-        // вызывается, когда @Binding stops изменился
-        updatePinsAndLine()
+        // если пришёл новый массив остановок → перерисовать
+        guard let pins = pinManager,
+              let lines = lineManager else { return }
+        pins.annotations.removeAll()
+        lines.annotations.removeAll()
+        addAnnotations(on: uiView, pins: pins, line: lines)
     }
 
-    // MARK: - helpers
-    private func updatePinsAndLine() {
-        guard let pinMgr  = pinManagerRef,
-              let lineMgr = lineManagerRef else { return }
+    // MARK: helpers
+    private func addAnnotations(on mv: MapView,
+                                pins: PointAnnotationManager,
+                                line: PolylineAnnotationManager) {
 
-        // очистим прежнее
-        pinMgr.annotations.removeAll()
-        lineMgr.annotations.removeAll()
-
-        // сортируем по orderIndex
-        let sorted = stops.sorted { $0.orderIndex < $1.orderIndex }
-
-        // преобразуем в PointAnnotation
-        var points: [PointAnnotation] = []
-        var coords: [CLLocationCoordinate2D] = []
-
-        for s in sorted {
-            let coord = CLLocationCoordinate2D(latitude:  s.coordinates.latitude,
-                                               longitude: s.coordinates.longitude)
-            coords.append(coord)
-
-            var point = PointAnnotation(coordinate: coord)
-            point.image = .default  // либо кастомный Asset
-            point.textField      = "\(s.orderIndex)"
-            point.textColor      = .white
-            point.textHaloColor  = .black
-            point.textHaloWidth  = 1.5
-            point.textAnchor     = .bottom
-            points.append(point)
+        // ♦︎ точки
+        let pointAnnots: [PointAnnotation] = stops.enumerated().map { idx, stop in
+                    var pa = PointAnnotation(coordinate: stop.coordinates.clCoord)
+            pa.image = .init(image: UIImage(named: "pin")!, name: "pin")
+            pa.textField       = "\(idx + 1)"
+                        pa.textSize        = 12
+                        pa.textAnchor      = .bottom
+                        pa.textOffset      = [0,-0.5]
+            return pa
         }
+        pins.annotations = pointAnnots
 
-        pinMgr.annotations = points
+        // ♦︎ ROUTE POLYLINE
+                let coords = stops.map { $0.coordinates.clCoord }
+                if coords.count > 1 {
+                    var poly = PolylineAnnotation(lineCoordinates: coords)
+                    poly.lineWidth  = 3
+                    poly.lineColor  = StyleColor(.systemBlue)
+                    line.annotations = [poly]
+                }
+        
+        fitCamera(mv: mv, coords: coords)
+        
+        // ♦︎ FIT CAMERA to route  –––––––––––––––––––––––––––––––––––––
+        func fitCamera(mv: MapView, coords: [CLLocationCoordinate2D]) {
+                guard !coords.isEmpty else { return }
 
-        // polyline
-        if coords.count >= 2 {
-            let pline = PolylineAnnotation(lineCoordinates: coords)
-            pline.lineWidth  = 3
-            pline.lineColor  = .init(UIColor.systemBlue)
-            lineMgr.annotations = [pline]
-        }
+                do {
+                    let cam = try mv.mapboxMap.camera(
+                        for: coords,                                   // Geometry → coords
+                        camera: CameraOptions(center: nil, zoom: nil), // базовая (nil = “как есть”)
+                        coordinatesPadding: .init(top: 60,
+                                                  left: 40,
+                                                  bottom: 260,
+                                                  right: 40),
+                        maxZoom: nil,
+                        offset: .zero)
+                    mv.mapboxMap.setCamera(to: cam)
+                } catch {
+                    print("❌ camera-fit error:", error)
+                }
+            }
+
     }
 }

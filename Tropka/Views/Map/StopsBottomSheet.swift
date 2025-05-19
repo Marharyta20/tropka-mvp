@@ -1,8 +1,3 @@
-//
-//  StopsBottomSheet.swift
-//  Tropka
-//
-
 import SwiftUI
 import SDWebImageSwiftUI
 import FirebaseFirestore   // for GeoPoint → if you ever need
@@ -101,7 +96,6 @@ private struct StopRow: View {
         HStack(spacing: 14) {
             WebImage(url: stop.photoURL)
                 .resizable()
-                .placeholder { Color.secondary.opacity(0.1) }
                 .scaledToFill()
                 .frame(width: 56, height: 56)
                 .clipShape(RoundedRectangle(cornerRadius: 8))

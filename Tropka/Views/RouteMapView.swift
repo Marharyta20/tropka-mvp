@@ -2,7 +2,7 @@ import SwiftUI
 import MapboxMaps
 
 struct RouteMapView: View {
-    @ObservedObject var vm: TourDetailsViewModel   // передаём уже загруженный VM
+    @ObservedObject var vm: TourDetailsViewModel
 
     // Map-related
     @State private var mapView: MapView?           // нужен, чтобы управлять камерой
@@ -15,7 +15,7 @@ struct RouteMapView: View {
             MapRepresentable(mapView: $mapView,
                              pinManager: $pinManager,
                              lineManager: $lineManager,
-                             stops: vm.stops)            // кастомный UIViewRepresentable
+                             stops: vm.stops)            
                 .edgesIgnoringSafeArea(.all)
 
             // 2️⃣ Мини‐лист остановок
@@ -24,9 +24,10 @@ struct RouteMapView: View {
         .onAppear {
             guard let first = vm.stops.first else { return }
             mapView?.camera.ease(
-                to: CameraOptions( center: first.coordinate,
-                                   zoom: 13),
-                duration: 0.8)
+                to: CameraOptions(center: first.coordinates.clCoord,
+                                  zoom: 13),
+                duration: 0.8
+            )
         }
     }
 }

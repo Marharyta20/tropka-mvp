@@ -6,6 +6,7 @@ import MapboxMaps   // на будущее — мини-карта для сто
 struct TourDetailsView: View {
     let route: Route
     @StateObject private var vm = TourDetailsViewModel()
+    @State private var showMap = false
 
     var body: some View {
         ScrollView {
@@ -48,6 +49,16 @@ struct TourDetailsView: View {
                         }
                     }
                 }
+                //–– MAP BUTTON (открывает картy) ––––––––––––––––––––
+                if !vm.stops.isEmpty {
+                    Button {
+                        showMap = true
+                    } label: {
+                        Label("Show on Map", systemImage: "map")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
 
                 //–– Buy / Save button
                 Button(
@@ -65,9 +76,11 @@ struct TourDetailsView: View {
             }
             .padding(20)
         }
-        // первый fetch при открытии
         .onAppear {
             vm.loadStops(routeID: route.id)
+        }
+        .sheet(isPresented: $showMap) {
+            RouteMapView(vm: vm)
         }
         .navigationTitle("Details")
         .navigationBarTitleDisplayMode(.inline)
