@@ -16,7 +16,12 @@ struct ExploreView: View {
                     ScrollView {
                         LazyVStack(spacing: 24) {
                             ForEach(vm.routes) { r in
-                                ExploreCard(route: r)
+                                NavigationLink {
+                                                                TourDetailsView(route: r)   // ⬅️ передаём весь объект
+                                                            } label: {
+                                                                ExploreCard(route: r)
+                                                            }
+                                                            .buttonStyle(.plain)          // убираем эффект нажатия
                             }
                         }
                         .padding(.horizontal, 16)
