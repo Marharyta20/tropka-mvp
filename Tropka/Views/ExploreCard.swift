@@ -3,7 +3,7 @@ import SwiftUI
 import SDWebImageSwiftUI
 
 struct ExploreCard: View {
-    let route: Route
+    let route: TourRoute
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

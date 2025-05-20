@@ -2,11 +2,10 @@ import Foundation
 import Combine
 
 final class RoutesViewModel: ObservableObject {
-    @Published var routes: [Route] = []
+    @Published var routes: [TourRoute] = []
     @Published var isLoading = false
     @Published var errorMsg: String?
 
-    /// Простой пример загрузки – подставьте ваш Firestore-сервис
     func loadRoutes() {
         isLoading = true
         FirestoreService.shared.fetchExploreRoutes { [weak self] result in

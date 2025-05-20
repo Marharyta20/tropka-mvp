@@ -1,5 +1,5 @@
 {
-  "originHash" : "75ec0d187da22e87551f0d586c10aed7d8ac25b38a800aff51bba73f8567e450",
+  "originHash" : "63725fb88d21994d0e8fd6e964532a5d6ed21b423a6e90f4de4aaaf6e5100cca",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -110,6 +110,15 @@
       }
     },
     {
+      "identity" : "mapbox-directions-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mapbox/mapbox-directions-swift.git",
+      "state" : {
+        "revision" : "65857d14080afa1e5463e0dbadd9dec23e66a6f3",
+        "version" : "0.30.0"
+      }
+    },
+    {
       "identity" : "mapbox-maps-ios",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mapbox/mapbox-maps-ios.git",
@@ -125,6 +134,15 @@
       "state" : {
         "revision" : "b7e1104502eca3a213b46303391ca4d3bc8ddec1",
         "version" : "2.30910.0"
+      }
+    },
+    {
+      "identity" : "polyline",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/raphaelmor/Polyline.git",
+      "state" : {
+        "revision" : "011fbc1b0f27a3398bd0fb7c5e2cf5c62ae82717",
+        "version" : "4.2.1"
       }
     },
     {

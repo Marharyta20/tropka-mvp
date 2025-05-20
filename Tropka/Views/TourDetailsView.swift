@@ -4,7 +4,7 @@ import MapboxMaps   // на будущее — мини-карта для сто
 
 // MARK: – Route details ▸ экран одного маршрута
 struct TourDetailsView: View {
-    let route: Route
+    let route: TourRoute
     @StateObject private var vm = TourDetailsViewModel()
     @State private var showMap = false
 
@@ -79,9 +79,12 @@ struct TourDetailsView: View {
         .onAppear {
             vm.loadStops(routeID: route.id)
         }
-        .sheet(isPresented: $showMap) {
-            RouteMapView(vm: vm)
+        .navigationDestination(isPresented: $showMap) {
+            RouteMapView(vm: vm)          // ← передаём тот же ViewModel
         }
+//        .sheet(isPresented: $showMap) {
+//            RouteMapView(vm: vm)
+//        }
         .navigationTitle("Details")
         .navigationBarTitleDisplayMode(.inline)
     }

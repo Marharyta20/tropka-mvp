@@ -7,7 +7,7 @@ final class ExploreViewModel: ObservableObject {
 
     // MARK: - Published state
 
-    @Published var routes:    [Route] = []
+    @Published var routes:    [TourRoute] = []
     @Published var isLoading: Bool    = false
     @Published var errorMsg:  String?
 
@@ -35,7 +35,7 @@ final class ExploreViewModel: ObservableObject {
                         return
                     }
 
-                    self.routes = snap?.documents.compactMap { doc -> Route? in
+                    self.routes = snap?.documents.compactMap { doc -> TourRoute? in
                         let d = doc.data()
 
                         // — required ﬁelds
@@ -47,7 +47,7 @@ final class ExploreViewModel: ObservableObject {
                         // — optional convert
                         let thumbURL = (d["thumbnailURL"] as? String).flatMap(URL.init)
 
-                        return Route(
+                        return TourRoute(
                             id:           doc.documentID,
                             title:        title,
                             authorUID:    author,

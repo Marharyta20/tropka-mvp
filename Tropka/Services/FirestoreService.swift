@@ -7,7 +7,7 @@ final class FirestoreService {
 
     /// Загружаем public-маршруты (первые 50, отсортированы по createdAt)
     func fetchExploreRoutes(
-        completion: @escaping (Result<[Route], Error>) -> Void
+        completion: @escaping (Result<[TourRoute], Error>) -> Void
     ) {
         db.collection("routes")
           .order(by: "createdAt", descending: true)
@@ -18,7 +18,7 @@ final class FirestoreService {
                   completion(.failure(err)); return
               }
 
-              let routes = snap?.documents.compactMap(Route.init(from:)) ?? []
+              let routes = snap?.documents.compactMap(TourRoute.init(from:)) ?? []
               completion(.success(routes))
           }
     }
@@ -58,7 +58,7 @@ final class FirestoreService {
 
     
 }
-extension Route {
+extension TourRoute {
     init?(from doc: QueryDocumentSnapshot) {
         let d = doc.data()
 

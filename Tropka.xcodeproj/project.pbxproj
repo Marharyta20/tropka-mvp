@@ -13,6 +13,7 @@
 		A80B0D202DCB5B6100A308A0 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A80B0D1F2DCB5B6100A308A0 /* FirebaseStorage */; };
 		A87F86D92DCB502700462F82 /* MapboxMaps in Frameworks */ = {isa = PBXBuildFile; productRef = A87F86D82DCB502700462F82 /* MapboxMaps */; };
 		A8C3440C2DDA4CF600ABB7C0 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = A8C3440B2DDA4CF600ABB7C0 /* SDWebImageSwiftUI */; };
+		A8C344562DDB690100ABB7C0 /* MapboxDirections in Frameworks */ = {isa = PBXBuildFile; productRef = A8C344552DDB690100ABB7C0 /* MapboxDirections */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +76,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A8C3440C2DDA4CF600ABB7C0 /* SDWebImageSwiftUI in Frameworks */,
+				A8C344562DDB690100ABB7C0 /* MapboxDirections in Frameworks */,
 				A87F86D92DCB502700462F82 /* MapboxMaps in Frameworks */,
 				A80B0D1A2DCB5B6100A308A0 /* FirebaseAuth in Frameworks */,
 				A80B0D1C2DCB5B6100A308A0 /* FirebaseFirestore in Frameworks */,
@@ -146,6 +148,7 @@
 				A80B0D1D2DCB5B6100A308A0 /* FirebaseFunctions */,
 				A80B0D1F2DCB5B6100A308A0 /* FirebaseStorage */,
 				A8C3440B2DDA4CF600ABB7C0 /* SDWebImageSwiftUI */,
+				A8C344552DDB690100ABB7C0 /* MapboxDirections */,
 			);
 			productName = Tropka;
 			productReference = A87F86A12DCB4DE700462F82 /* Tropka.app */;
@@ -233,6 +236,7 @@
 				A87F86D72DCB502700462F82 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */,
 				A80B0D182DCB5B6100A308A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				A8C3440A2DDA4CF600ABB7C0 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
+				A8C344542DDB690100ABB7C0 /* XCRemoteSwiftPackageReference "mapbox-directions-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A87F86A22DCB4DE700462F82 /* Products */;
@@ -627,6 +631,15 @@
 				minimumVersion = 3.1.3;
 			};
 		};
+		A8C344542DDB690100ABB7C0 /* XCRemoteSwiftPackageReference "mapbox-directions-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mapbox/mapbox-directions-swift.git";
+			requirement = {
+				kind = versionRange;
+				maximumVersion = 3.0.0;
+				minimumVersion = 2.14.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -659,6 +672,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A8C3440A2DDA4CF600ABB7C0 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
 			productName = SDWebImageSwiftUI;
+		};
+		A8C344552DDB690100ABB7C0 /* MapboxDirections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A8C344542DDB690100ABB7C0 /* XCRemoteSwiftPackageReference "mapbox-directions-swift" */;
+			productName = MapboxDirections;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

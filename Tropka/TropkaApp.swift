@@ -18,8 +18,10 @@ struct TropkaApp: App {
 
   var body: some Scene {
     WindowGroup {
-        ContentView()
-        //TestView()
+        NavigationStack{
+            ContentView()
+            //TestView()
+        }
     }
   }
 }

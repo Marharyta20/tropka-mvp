@@ -19,6 +19,7 @@ struct MapRepresentable: UIViewRepresentable {
     @Binding var lineManager: PolylineAnnotationManager?
 
     let stops: [Stop]
+    let routeCoords: [CLLocationCoordinate2D]
 
     func makeUIView(context: Context) -> MapView {
         let opts = MapInitOptions(styleURI: .streets)
@@ -68,13 +69,14 @@ struct MapRepresentable: UIViewRepresentable {
         pins.annotations = pointAnnots
 
         // ♦︎ ROUTE POLYLINE
-                let coords = stops.map { $0.coordinates.clCoord }
-                if coords.count > 1 {
-                    var poly = PolylineAnnotation(lineCoordinates: coords)
-                    poly.lineWidth  = 3
-                    poly.lineColor  = StyleColor(.systemBlue)
-                    line.annotations = [poly]
-                }
+        let coords = !routeCoords.isEmpty ? routeCoords
+                                           : stops.map { $0.coordinates.clCoord }
+        if coords.count > 1 {
+            var poly = PolylineAnnotation(lineCoordinates: coords)
+            poly.lineWidth  = 3
+            poly.lineColor  = StyleColor(.systemBlue)
+            line.annotations = [poly]
+        }
         
         fitCamera(mv: mv, coords: coords)
         
