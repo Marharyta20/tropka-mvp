@@ -17,6 +17,7 @@ class ProfileViewModel: ObservableObject {
     @Published var displayName = "Loading..."
     @Published var city        = ""
     @Published var registrationDate: Date?
+    @Published var handle      = ""           // unique @username / nick
     
     // saved / purchased routes
     @Published var routes: [SavedRoute] = []
@@ -43,7 +44,8 @@ class ProfileViewModel: ObservableObject {
                 if let err = err { self?.errorMessage = err.localizedDescription; return }
                 guard let data = snap?.data() else { self?.errorMessage = "Profile not found"; return }
                 
-                self?.displayName = data["username"] as? String ?? "Unknown User"
+                self?.displayName = data["fullName"] as? String ?? "Unknown User"
+                self?.handle      = data["username"]  as? String ?? "user"
                 self?.city        = data["city"]     as? String ?? ""
                 if let ts = data["registrationDate"] as? Timestamp {
                     self?.registrationDate = ts.dateValue()

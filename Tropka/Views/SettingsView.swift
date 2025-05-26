@@ -2,45 +2,97 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject var profileVM: ProfileViewModel
     @StateObject private var vm = SettingsViewModel()
 
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Profile")) {
-                    TextField("Name", text: $vm.displayName)
-                    TextField("City", text: $vm.city)
-                    Button("Save") {
-                        Task { await vm.save(); dismiss() }
-                    }
-                    .disabled(vm.displayName.isEmpty)
-                }
+    @State private var showSaved = false
 
-                Section {
-                    Button("Sign Out", role: .destructive) {
-                        vm.signOut()
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 28) {
+
+                //–– Full name
+                editableField(title: "FULL NAME", text: $vm.displayName,
+                              keyboard: .default)
+
+                //–– City
+                editableField(title: "CITY", text: $vm.city,
+                              keyboard: .default)
+
+                //–– Username
+                editableField(title: "USERNAME", text: $vm.username,
+                              keyboard: .asciiCapable)
+
+                //–– Save
+                Button("Save") {
+                    Task {
+                        await vm.save()
+                        profileVM.displayName = vm.displayName
+                        profileVM.city        = vm.city
+                        profileVM.handle      = vm.username
+                        showSaved = true
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
+
+                //–– Sign out
+                Button("Sign Out", role: .destructive) {
+                    vm.signOut()
+                    dismiss()
+                }
+                .frame(maxWidth: .infinity)
+
+                //–– Delete
+                Button("Delete Account", role: .destructive) {
+                    Task {
+                        await vm.deleteAccount()
                         dismiss()
                     }
                 }
+                .frame(maxWidth: .infinity)
+            }
+            .padding(24)
+        }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .overlay { if vm.isBusy { ProgressView().scaleEffect(1.3) } }
+        .alert("Changes saved", isPresented: $showSaved) {
+            Button("OK", role: .cancel) { }
+        }
+        .alert("Error", isPresented: Binding(
+            get: { vm.error != nil },
+            set: { _ in vm.error = nil })
+        ) { Button("OK", role: .cancel) { } } message: {
+            Text(vm.error ?? "")
+        }
+        .onAppear { vm.prefill(with: profileVM) }
+    }
 
-                Section {
-                    Button("Delete Account", role: .destructive) {
-                        Task { await vm.deleteAccount(); dismiss() }
-                    }
-                }
+    // MARK: reusable field
+    @ViewBuilder
+    private func editableField(title: String,
+                               text: Binding<String>,
+                               keyboard: UIKeyboardType,
+                               prefix: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.secondary)
+
+            HStack {
+                if let prefix { Text(prefix).foregroundColor(.secondary) }
+                TextField("", text: text)
+                    .keyboardType(keyboard)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
             }
-            .navigationTitle("Settings")
-            .overlay {
-                if vm.isBusy { ProgressView().scaleEffect(1.3) }
-            }
-            .alert("Error", isPresented: Binding<Bool>(
-                get: { vm.error != nil },
-                set: { _ in vm.error = nil })
-            ) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(vm.error ?? "")
-            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.secondary.opacity(0.3))
+            )
         }
     }
 }
