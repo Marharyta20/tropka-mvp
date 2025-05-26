@@ -35,11 +35,12 @@ class SettingsViewModel: ObservableObject {
         isBusy = true
         
         do {
-            try await db.collection("users").document(uid).updateData([
+            let data: [String: Any] = [
                 "fullName" : displayName,
                 "city"     : city,
                 "username" : username
-            ])
+            ]
+            try await db.collection("users").document(uid).updateData(data)
             isBusy = false
         } catch {
             isBusy = false

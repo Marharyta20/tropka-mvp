@@ -9,13 +9,15 @@ struct ProfileView: View {
     @State private   var showSettings      = false
     @State private   var selectedTab: Tab  = .routes
     @Namespace private var underlineNS     // for animation
+    @State private var pendingDelete: SavedRoute?
+    @State private var showDeleteConfirm = false
     
     enum Tab { case routes, reviews }
     
     // MARK: body
     var body: some View {
         NavigationStack {
-            ScrollView {
+    
                 VStack(alignment: .leading, spacing: 20) {
                     
                     header
@@ -25,7 +27,7 @@ struct ProfileView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-            }
+            
             .navigationTitle("")              // empty = no title text
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $showSettings) {
@@ -108,35 +110,56 @@ struct ProfileView: View {
     @ViewBuilder
     private var tabContent: some View {
         switch selectedTab {
+
         case .routes:
             if vm.routes.isEmpty {
                 Text("No saved routes yet")
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else {
-                VStack(spacing: 12) {
+                List {
                     ForEach(vm.routes) { item in
                         NavigationLink {
-                            SavedRouteMapScreen(
-                                routeID: item.route.id,
-                                title:   item.route.title
-                            )
+                            SavedRouteMapScreen(routeID: item.route.id,
+                                                title:   item.route.title)
                         } label: {
-                            ProfileRouteCell(item: item)
+                            ProfileRouteCell(item: item)             // no custom chevron anymore
                         }
-                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                pendingDelete = item                 // remember which
+                                showDeleteConfirm = true             // show dialog
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                        }
                     }
                 }
+                .listStyle(.plain)
+                .confirmationDialog(
+                    "Remove this route?",
+                    isPresented: $showDeleteConfirm,
+                    titleVisibility: .visible
+                ) {
+                    Button("Delete", role: .destructive) {
+                        if let r = pendingDelete {
+                            Task { await vm.unsave(routeID: r.route.id) }
+                        }
+                    }
+                    Button("Cancel", role: .cancel) { pendingDelete = nil }
+                }
             }
-            
+
         case .reviews:
-            VStack(spacing: 12) {
+            List {
                 ForEach(sampleReviews, id: \.title) { rev in
                     ProfileReviewCell(title: rev.title, text: rev.text)
                 }
             }
+            .listStyle(.plain)
         }
     }
+
     
     // placeholder reviews
     private let sampleReviews: [(title: String, text: String)] = [
@@ -215,8 +238,6 @@ private struct ProfileRouteCell: View {
                 .background(item.isPurchased ? Color.green : Color.blue)
                 .clipShape(Capsule())
             
-            Image(systemName: "chevron.right")
-                .foregroundColor(.secondary)
         }
         .padding()
         .background(Color(.systemBackground))

@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
+import SwiftUI
 
 // MARK: – DTO
 struct SavedRoute: Identifiable {
@@ -130,5 +131,28 @@ class ProfileViewModel: ObservableObject {
                     }
                 }
             }
+    }
+
+    func unsave(routeID: String) async {
+        guard let uid = auth.currentUser?.uid else {
+            errorMessage = "Unable to get user UID"
+            return
+        }
+
+        // optimistic UI update
+        if let idx = routes.firstIndex(where: { $0.id == routeID }) {
+            _ = withAnimation { routes.remove(at: idx) }  
+        }
+
+        do {
+            try await db.collection("users")
+                .document(uid)
+                .collection("savedRoutes")
+                .document(routeID)
+                .delete()
+        } catch {
+            fetchSavedRoutes()
+            errorMessage = error.localizedDescription
+        }
     }
 }
