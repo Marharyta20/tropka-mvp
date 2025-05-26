@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import FirebaseAuth
 import FirebaseFirestore
 import SwiftUI
@@ -29,9 +30,13 @@ class ProfileViewModel: ObservableObject {
     private let db   = Firestore.firestore()
     private let auth = Auth.auth()
     
+    private var cancellable: AnyCancellable?
+    
     init() {
         fetchUserProfile()
         fetchSavedRoutes()
+        cancellable = SavedRoutesStore.shared.$savedIDs
+                    .sink { [weak self] _ in self?.fetchSavedRoutes() }
     }
     
     // MARK: – Profile

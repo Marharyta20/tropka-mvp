@@ -7,6 +7,32 @@ struct TourDetailsView: View {
     let route: TourRoute
     @StateObject private var vm = TourDetailsViewModel()
     @State private var showMap = false
+    
+    // MARK: – CTA button
+    @ViewBuilder
+    private var saveBuyButton: some View {
+        if route.isFree {
+            Button {
+                Task {
+                    if !vm.isSaved { await vm.save() }
+                }
+            } label: {
+                Text(vm.isSaved ? "Saved" : "Get for free")
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(vm.isSaved)
+
+        } else {
+            Button {
+                // TODO: payment flow
+            } label: {
+                Text(String(format: "Buy €%.2f", route.price ?? 0))
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -60,14 +86,8 @@ struct TourDetailsView: View {
                     .buttonStyle(.borderedProminent)
                 }
 
-                //–– Buy / Save button
-                Button(
-                    route.isFree
-                    ? "Save Route"
-                    : String(format: "Buy for €%.2f", route.price ?? 0)
-                ) {
-                    // TODO: save / buy logic
-                }
+                //–– Save / Buy button
+                saveBuyButton
                 .frame(maxWidth: .infinity, minHeight: 48)
                 .background(Color.blue)
                 .foregroundColor(.white)
@@ -121,3 +141,4 @@ private struct StopRow: View {
         }
     }
 }
+

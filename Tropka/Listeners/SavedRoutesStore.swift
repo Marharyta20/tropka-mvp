@@ -1,4 +1,3 @@
-// SavedRoutesStore.swift
 import FirebaseAuth
 import FirebaseFirestore
 import Combine

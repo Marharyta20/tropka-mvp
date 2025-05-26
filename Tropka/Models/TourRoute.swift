@@ -27,4 +27,5 @@ struct TourRoute: Identifiable {
     var isFree: Bool { price == nil }
     
     let stopsCount: Int
+    var isActuallyFree: Bool { isFree || (price ?? 0) == 0 }
 }

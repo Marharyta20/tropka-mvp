@@ -10,6 +10,23 @@ final class TourDetailsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMsg: String?
     @Published var routeCoords: [CLLocationCoordinate2D] = []
+    @Published var isSaved = false
+    private let saveSvc = SavedRoutesService()
+    private var currentRouteID: String?
+
+    func load(routeID: String) async {
+        currentRouteID = routeID
+        isSaved = await saveSvc.isSaved(routeID: routeID)
+        // plus existing loadStops…
+    }
+
+    @MainActor
+    func save() async {
+        guard let id = currentRouteID else { return }
+        try? await saveSvc.save(routeID: id)
+        isSaved = true
+    }
+
 
     /// Loads all stops for a given route (sub-collection `/stops`)
     func loadStops(routeID: String) {
