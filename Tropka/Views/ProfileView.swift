@@ -12,21 +12,22 @@ struct ProfileView: View {
     @State private var pendingDelete: SavedRoute?
     @State private var showDeleteConfirm = false
     
-    enum Tab { case routes, reviews }
+    enum Tab { case routes, reviews, wishlist }
+    
     
     // MARK: body
     var body: some View {
         NavigationStack {
-    
-                VStack(alignment: .leading, spacing: 20) {
-                    
-                    header
-                    actionRow
-                    tabBar
-                    tabContent
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+            
+            VStack(alignment: .leading, spacing: 20) {
+                
+                header
+                actionRow
+                tabBar
+                tabContent
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
             
             .navigationTitle("")              // empty = no title text
             .navigationBarTitleDisplayMode(.inline)
@@ -83,6 +84,7 @@ struct ProfileView: View {
         HStack(spacing: 28) {
             tabButton(title: "Your Routes", tab: .routes)
             tabButton(title: "Reviews",     tab: .reviews)
+            tabButton(title: "Wishlist", tab:.wishlist)
             Spacer()
         }
     }
@@ -110,7 +112,7 @@ struct ProfileView: View {
     @ViewBuilder
     private var tabContent: some View {
         switch selectedTab {
-
+            
         case .routes:
             if vm.routes.isEmpty {
                 Text("No saved routes yet")
@@ -123,7 +125,7 @@ struct ProfileView: View {
                             SavedRouteMapScreen(routeID: item.route.id,
                                                 title:   item.route.title)
                         } label: {
-                            ProfileRouteCell(item: item)             // no custom chevron anymore
+                            ProfileRouteCell(item: item, showStatus: true)
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
@@ -149,7 +151,7 @@ struct ProfileView: View {
                     Button("Cancel", role: .cancel) { pendingDelete = nil }
                 }
             }
-
+            
         case .reviews:
             List {
                 ForEach(sampleReviews, id: \.title) { rev in
@@ -157,9 +159,25 @@ struct ProfileView: View {
                 }
             }
             .listStyle(.plain)
+            
+        case .wishlist:
+            List(vm.wishlist) { item in
+                NavigationLink {
+                    SavedRouteMapScreen(routeID: item.route.id,
+                                        title:   item.route.title)
+                } label: {
+                    ProfileRouteCell(
+                        item: item,
+                        showStatus: false,
+                        onHeartTap: { vm.unwish(routeID: item.route.id) }   // 🧡
+                    )
+                }
+            }
+            .listStyle(.plain)
+            
         }
     }
-
+    
     
     // placeholder reviews
     private let sampleReviews: [(title: String, text: String)] = [
@@ -192,6 +210,8 @@ extension ProfileView {
 // MARK: route cell
 private struct ProfileRouteCell: View {
     let item: SavedRoute
+    var showStatus: Bool = true
+    var onHeartTap: (() -> Void)? = nil
     
     var body: some View {
         HStack(spacing: 12) {
@@ -231,12 +251,22 @@ private struct ProfileRouteCell: View {
             
             Spacer()
             
-            Text(item.isPurchased ? "Bought" : "Saved")
-                .font(.caption2).bold()
-                .foregroundColor(.white)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(item.isPurchased ? Color.green : Color.blue)
-                .clipShape(Capsule())
+            
+            if showStatus {
+                Text(item.isPurchased ? "Bought" : "Saved")
+                    .font(.caption2).bold()
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(item.isPurchased ? Color.green : Color.blue)
+                    .clipShape(Capsule())
+            } else {
+                Button(action: { onHeartTap?() }) {
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(.orange)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
+            }
             
         }
         .padding()

@@ -106,14 +106,17 @@ struct ExploreCard: View {
                 .foregroundColor(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 
-                Button { /* TODO: wishlist */ } label: {
-                    Image(systemName: "heart")
+                Button {
+                    vm.toggleWish()
+                } label: {
+                    Image(systemName: vm.isWished ? "heart.fill" : "heart")
                         .font(.title3)
                         .padding(12)
+                        .foregroundColor(vm.isWished ? .red : .blue)
                 }
-                .foregroundColor(.blue)
                 .background(Color(.systemGray6))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .buttonStyle(.plain)
             }
         }
         .padding()

@@ -32,11 +32,19 @@ class ProfileViewModel: ObservableObject {
     
     private var cancellable: AnyCancellable?
     
+    @Published var wishlist: [SavedRoute] = []
+    private var wishCanc: AnyCancellable?
+    private let wishlistSvc = WishlistService()
+    
     init() {
         fetchUserProfile()
         fetchSavedRoutes()
         cancellable = SavedRoutesStore.shared.$savedIDs
-                    .sink { [weak self] _ in self?.fetchSavedRoutes() }
+            .sink { [weak self] _ in self?.fetchSavedRoutes() }
+        wishCanc = WishlistStore.shared.$ids
+            .sink { [weak self] ids in
+                Task { await self?.loadWishlist(ids: ids) }
+            }
     }
     
     // MARK: – Profile
@@ -160,4 +168,47 @@ class ProfileViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
+    
+    @MainActor
+    private func loadWishlist(ids: Set<String>) async {
+        guard !ids.isEmpty else { wishlist = []; return }
+
+        let idArray = Array(ids)
+        let chunks = stride(from: 0, to: idArray.count, by: 10)
+            .map { Array(idArray[$0..<min($0+10, idArray.count)]) }
+
+        var collected: [SavedRoute] = []
+        for chunk in chunks {
+            if let qs = try? await db.collection("routes")
+                    .whereField(FieldPath.documentID(), in: chunk)
+                    .getDocuments() {
+
+                for doc in qs.documents {
+                    let d = doc.data()
+                    let route = TourRoute(
+                        id:          doc.documentID,
+                        title:       d["title"]        as? String ?? "Untitled",
+                        authorUID:   d["authorUID"]    as? String ?? "",
+                        rating:      d["rating"]       as? Double ?? 0,
+                        reviewCount: d["reviewCount"]  as? Int ?? 0,
+                        duration:    d["duration"]     as? Double ?? 0,
+                        tags:        (d["tags"] as? [Any])?.compactMap { $0 as? String } ?? [],
+                        price:       d["price"]        as? Double,
+                        thumbnailURL:(d["thumbnailURL"] as? String).flatMap(URL.init),
+                        stopsCount:  d["stopsCount"]   as? Int ?? 0
+                    )
+                    collected.append(
+                        SavedRoute(route: route,
+                                   savedAt: nil,
+                                   isPurchased: false)
+                    )
+                }
+            }
+        }
+        wishlist = collected.sorted { $0.route.title < $1.route.title }
+    }
+    
+    func unwish(routeID: String) {
+            Task { try? await wishlistSvc.set(false, routeID: routeID) }
+        }
 }

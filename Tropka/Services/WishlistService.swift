@@ -1,4 +1,3 @@
-// WishlistService.swift
 import FirebaseAuth
 import FirebaseFirestore
 
