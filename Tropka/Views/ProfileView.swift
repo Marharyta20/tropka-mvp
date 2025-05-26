@@ -1,5 +1,4 @@
 import SwiftUI
-import FirebaseAuth
 
 struct ProfileView: View {
     @StateObject private var vm = ProfileViewModel()
@@ -8,49 +7,90 @@ struct ProfileView: View {
     enum Tab: String, CaseIterable {
         case yourRoutes = "Your Routes"
         case reviews    = "Reviews"
-        case following  = "Following"
     }
-
+    
     @State private var selectedTab: Tab = .yourRoutes
-
-    // Sample placeholders
-    private var sampleRoutes: [String] = [
+    
+    // Temporary placeholders
+    private let sampleRoutes: [String] = [
         "Hidden Cafés in Warsaw",
         "City Street Art Tour"
     ]
-    private var sampleReviews: [(title: String, text: String)] = [
+    private let sampleReviews: [(title: String, text: String)] = [
         ("Hidden Cafés in Warsaw", "Coffee here is top-notch!"),
-        ("City Street Art Tour",    "Loved the colorful murals.")
+        ("City Street Art Tour",   "Loved the colorful murals.")
     ]
-    private var sampleFollowing: [String] = ["Anna G.", "Mia C.", "Noah A."]
-
+    
+    struct SavedRouteMapScreen: View {
+        let routeID: String
+        let title: String
+        
+        @StateObject private var vm = TourDetailsViewModel()
+        
+        var body: some View {
+            RouteMapView(vm: vm)
+                .navigationTitle(title)
+                .onAppear {
+                    // загружаем остановки один раз
+                    if vm.stops.isEmpty {
+                        vm.loadStops(routeID: routeID)
+                    }
+                }
+        }
+    }
+    
+    @ViewBuilder
+    private var routesSection: some View {
+        if vm.routes.isEmpty {
+            Text("No saved routes yet")
+                .foregroundColor(.secondary)
+                .padding(.top, 32)
+        } else {
+            ForEach(vm.routes) { item in
+                NavigationLink {
+                    SavedRouteMapScreen(
+                        routeID: item.route.id,
+                        title:   item.route.title
+                    )
+                } label: {
+                    ProfileRouteCell(item: item)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+    
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
-                // MARK: — Header
+                
+                // MARK: Header
                 HStack(spacing: 12) {
-   
-                    // ← this pulls “profile-placeholder” from Assets.xcassets
                     Image("profile-placeholder")
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: 64, height: 64)
                         .clipShape(Circle())
-
+                    
                     VStack(alignment: .leading, spacing: 4) {
-//                        Text("Catherin Collins")
-//                            .font(.title2).bold()
-//                        Text("Berlin")
-//                            .font(.subheadline)
-//                            .foregroundColor(.secondary)
-                        Text(vm.displayName).font(.title2).bold()
-                        Text(vm.city).font(.subheadline).foregroundColor(.secondary)
+                        Text(vm.displayName)
+                            .font(.title2).bold()
+                        Text(vm.city)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        if let joined = vm.registrationDate {
+                            Text("Joined \(joined.formatted(date: .long, time: .omitted))")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
                     }
-
+                    
                     Spacer()
-
+                    
                     Button(action: {
-                        // TODO: settings action
+                        // TODO: settings screen
                     }) {
                         Image(systemName: "gearshape")
                             .font(.title3)
@@ -58,8 +98,16 @@ struct ProfileView: View {
                     }
                 }
                 .padding(.horizontal)
-
-                // MARK: — Segmented Control
+                
+                // Error banner
+                if let error = vm.errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .padding(.horizontal)
+                }
+                
+                // MARK: Segmented control
                 Picker("Tab", selection: $selectedTab) {
                     ForEach(Tab.allCases, id: \.self) { tab in
                         Text(tab.rawValue).tag(tab)
@@ -67,24 +115,16 @@ struct ProfileView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
-
-                // MARK: — Content
+                
+                // MARK: Content
                 ScrollView {
                     VStack(spacing: 12) {
                         switch selectedTab {
                         case .yourRoutes:
-                            ForEach(sampleRoutes, id: \.self) { route in
-                                ProfileRouteCell(title: route)
-                            }
-
+                            routesSection
                         case .reviews:
                             ForEach(sampleReviews, id: \.title) { review in
                                 ProfileReviewCell(title: review.title, text: review.text)
-                            }
-
-                        case .following:
-                            ForEach(sampleFollowing, id: \.self) { name in
-                                ProfileFollowingCell(name: name)
                             }
                         }
                     }
@@ -97,32 +137,72 @@ struct ProfileView: View {
     }
 }
 
-// MARK: — Cells
-
+// MARK: - Cells
 private struct ProfileRouteCell: View {
-    let title: String
+    let item: SavedRoute
+    
     var body: some View {
-        HStack {
-            Image(systemName: "map")
-                .frame(width: 40, height: 40)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(8)
-
-            Text(title)
-                .font(.headline)
-                .lineLimit(1)
-
+        HStack(spacing: 12) {
+            
+            // MARK: Thumbnail
+            Group {
+                if let url = item.route.thumbnailURL {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let img):
+                            img.resizable().scaledToFill()
+                        default:
+                            Image(systemName: "photo")
+                                .resizable()
+                                .scaledToFit()
+                                .foregroundColor(.gray.opacity(0.6))
+                        }
+                    }
+                } else {
+                    Image(systemName: "photo")
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundColor(.gray.opacity(0.6))
+                        .background(Color.gray.opacity(0.1))
+                }
+            }
+            .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // MARK: Title + date
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.route.title)
+                    .font(.headline)
+                    .lineLimit(1)
+                
+                if let date = item.savedAt {
+                    Text("Saved \(date.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
             Spacer()
-
-            Button("Start") { }
-                .buttonStyle(.borderedProminent)
+            
+            // MARK: Status badge
+            Text(item.isPurchased ? "Bought" : "Saved")
+                .font(.caption2).bold()
+                .foregroundColor(.white)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(item.isPurchased ? Color.green : Color.blue)
+                .clipShape(Capsule())
+            
+            Image(systemName: "chevron.right")
+                .foregroundColor(.secondary)
         }
         .padding()
         .background(Color(.systemBackground))
         .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
     }
 }
+
+
 
 private struct ProfileReviewCell: View {
     let title: String
@@ -153,31 +233,7 @@ private struct ProfileReviewCell: View {
     }
 }
 
-private struct ProfileFollowingCell: View {
-    let name: String
-    var body: some View {
-        HStack {
-            Image(systemName: "person.circle.fill")
-                .resizable()
-                .frame(width: 40, height: 40)
-                .foregroundColor(.blue)
-
-            Text(name)
-                .font(.body)
-
-            Spacer()
-
-            Button("See Routes") { }
-                .buttonStyle(.bordered)
-            Button("Unfollow") { }
-                .buttonStyle(.bordered)
-                .tint(.red)
-        }
-        .padding(.vertical, 8)
-    }
-}
-
-// MARK: — Preview
+// MARK: - Preview
 
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {

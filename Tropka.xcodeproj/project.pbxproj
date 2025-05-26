@@ -7,13 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A80B0D1A2DCB5B6100A308A0 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A80B0D192DCB5B6100A308A0 /* FirebaseAuth */; };
-		A80B0D1C2DCB5B6100A308A0 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A80B0D1B2DCB5B6100A308A0 /* FirebaseFirestore */; };
-		A80B0D1E2DCB5B6100A308A0 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = A80B0D1D2DCB5B6100A308A0 /* FirebaseFunctions */; };
-		A80B0D202DCB5B6100A308A0 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A80B0D1F2DCB5B6100A308A0 /* FirebaseStorage */; };
+		A80584102DE34471006D041C /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A805840F2DE34471006D041C /* FirebaseAuth */; };
+		A80584122DE34471006D041C /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = A80584112DE34471006D041C /* FirebaseDatabase */; };
+		A80584142DE34471006D041C /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A80584132DE34471006D041C /* FirebaseFirestore */; };
+		A80584162DE34471006D041C /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = A80584152DE34471006D041C /* FirebaseFunctions */; };
+		A80584182DE34471006D041C /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A80584172DE34471006D041C /* FirebaseStorage */; };
+		A805841B2DE34566006D041C /* MapboxDirections in Frameworks */ = {isa = PBXBuildFile; productRef = A805841A2DE34566006D041C /* MapboxDirections */; };
 		A87F86D92DCB502700462F82 /* MapboxMaps in Frameworks */ = {isa = PBXBuildFile; productRef = A87F86D82DCB502700462F82 /* MapboxMaps */; };
 		A8C3440C2DDA4CF600ABB7C0 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = A8C3440B2DDA4CF600ABB7C0 /* SDWebImageSwiftUI */; };
-		A8C344562DDB690100ABB7C0 /* MapboxDirections in Frameworks */ = {isa = PBXBuildFile; productRef = A8C344552DDB690100ABB7C0 /* MapboxDirections */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,13 +76,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A80584122DE34471006D041C /* FirebaseDatabase in Frameworks */,
+				A80584162DE34471006D041C /* FirebaseFunctions in Frameworks */,
 				A8C3440C2DDA4CF600ABB7C0 /* SDWebImageSwiftUI in Frameworks */,
-				A8C344562DDB690100ABB7C0 /* MapboxDirections in Frameworks */,
+				A805841B2DE34566006D041C /* MapboxDirections in Frameworks */,
 				A87F86D92DCB502700462F82 /* MapboxMaps in Frameworks */,
-				A80B0D1A2DCB5B6100A308A0 /* FirebaseAuth in Frameworks */,
-				A80B0D1C2DCB5B6100A308A0 /* FirebaseFirestore in Frameworks */,
-				A80B0D202DCB5B6100A308A0 /* FirebaseStorage in Frameworks */,
-				A80B0D1E2DCB5B6100A308A0 /* FirebaseFunctions in Frameworks */,
+				A80584182DE34471006D041C /* FirebaseStorage in Frameworks */,
+				A80584102DE34471006D041C /* FirebaseAuth in Frameworks */,
+				A80584142DE34471006D041C /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -143,12 +145,13 @@
 			name = Tropka;
 			packageProductDependencies = (
 				A87F86D82DCB502700462F82 /* MapboxMaps */,
-				A80B0D192DCB5B6100A308A0 /* FirebaseAuth */,
-				A80B0D1B2DCB5B6100A308A0 /* FirebaseFirestore */,
-				A80B0D1D2DCB5B6100A308A0 /* FirebaseFunctions */,
-				A80B0D1F2DCB5B6100A308A0 /* FirebaseStorage */,
 				A8C3440B2DDA4CF600ABB7C0 /* SDWebImageSwiftUI */,
-				A8C344552DDB690100ABB7C0 /* MapboxDirections */,
+				A805840F2DE34471006D041C /* FirebaseAuth */,
+				A80584112DE34471006D041C /* FirebaseDatabase */,
+				A80584132DE34471006D041C /* FirebaseFirestore */,
+				A80584152DE34471006D041C /* FirebaseFunctions */,
+				A80584172DE34471006D041C /* FirebaseStorage */,
+				A805841A2DE34566006D041C /* MapboxDirections */,
 			);
 			productName = Tropka;
 			productReference = A87F86A12DCB4DE700462F82 /* Tropka.app */;
@@ -234,9 +237,9 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A87F86D72DCB502700462F82 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */,
-				A80B0D182DCB5B6100A308A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				A8C3440A2DDA4CF600ABB7C0 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
-				A8C344542DDB690100ABB7C0 /* XCRemoteSwiftPackageReference "mapbox-directions-swift" */,
+				A805840E2DE34471006D041C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				A80584192DE34566006D041C /* XCRemoteSwiftPackageReference "mapbox-directions-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A87F86A22DCB4DE700462F82 /* Products */;
@@ -607,12 +610,20 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		A80B0D182DCB5B6100A308A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+		A805840E2DE34471006D041C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 11.12.0;
+				minimumVersion = 11.13.0;
+			};
+		};
+		A80584192DE34566006D041C /* XCRemoteSwiftPackageReference "mapbox-directions-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mapbox/mapbox-directions-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.1;
 			};
 		};
 		A87F86D72DCB502700462F82 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */ = {
@@ -631,37 +642,38 @@
 				minimumVersion = 3.1.3;
 			};
 		};
-		A8C344542DDB690100ABB7C0 /* XCRemoteSwiftPackageReference "mapbox-directions-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mapbox/mapbox-directions-swift.git";
-			requirement = {
-				kind = versionRange;
-				maximumVersion = 3.0.0;
-				minimumVersion = 2.14.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A80B0D192DCB5B6100A308A0 /* FirebaseAuth */ = {
+		A805840F2DE34471006D041C /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A80B0D182DCB5B6100A308A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			package = A805840E2DE34471006D041C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
 		};
-		A80B0D1B2DCB5B6100A308A0 /* FirebaseFirestore */ = {
+		A80584112DE34471006D041C /* FirebaseDatabase */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A80B0D182DCB5B6100A308A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			package = A805840E2DE34471006D041C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseDatabase;
+		};
+		A80584132DE34471006D041C /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A805840E2DE34471006D041C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
 		};
-		A80B0D1D2DCB5B6100A308A0 /* FirebaseFunctions */ = {
+		A80584152DE34471006D041C /* FirebaseFunctions */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A80B0D182DCB5B6100A308A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			package = A805840E2DE34471006D041C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFunctions;
 		};
-		A80B0D1F2DCB5B6100A308A0 /* FirebaseStorage */ = {
+		A80584172DE34471006D041C /* FirebaseStorage */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A80B0D182DCB5B6100A308A0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			package = A805840E2DE34471006D041C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		A805841A2DE34566006D041C /* MapboxDirections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A80584192DE34566006D041C /* XCRemoteSwiftPackageReference "mapbox-directions-swift" */;
+			productName = MapboxDirections;
 		};
 		A87F86D82DCB502700462F82 /* MapboxMaps */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -672,11 +684,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A8C3440A2DDA4CF600ABB7C0 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
 			productName = SDWebImageSwiftUI;
-		};
-		A8C344552DDB690100ABB7C0 /* MapboxDirections */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A8C344542DDB690100ABB7C0 /* XCRemoteSwiftPackageReference "mapbox-directions-swift" */;
-			productName = MapboxDirections;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

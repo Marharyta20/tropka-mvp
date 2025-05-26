@@ -1,39 +1,132 @@
 import Foundation
-import Firebase
+import FirebaseAuth
 import FirebaseFirestore
-import FirebaseAuth      // ← don’t forget this!
 
-final class ProfileViewModel: ObservableObject {
-  @Published var displayName = ""
-  @Published var city        = ""
+// MARK: – DTO
+struct SavedRoute: Identifiable {
+    let route: TourRoute
+    let savedAt: Date?
+    let isPurchased: Bool
+    var id: String { route.id }
+}
 
-  private let db = Firestore.firestore()
-
-  func fetchProfile() {
-    print("🔍 fetchProfile called")
-    guard let uid = Auth.auth().currentUser?.uid else {
-      print("⚠️ No logged-in user; Auth.auth().currentUser is nil")
-      return
+@MainActor
+class ProfileViewModel: ObservableObject {
+    
+    // user
+    @Published var displayName = "Loading..."
+    @Published var city        = ""
+    @Published var registrationDate: Date?
+    
+    // saved / purchased routes
+    @Published var routes: [SavedRoute] = []
+    
+    // error banner
+    @Published var errorMessage: String?
+    
+    private let db   = Firestore.firestore()
+    private let auth = Auth.auth()
+    
+    init() {
+        fetchUserProfile()
+        fetchSavedRoutes()
     }
-    print("ℹ️ Using uid: \(uid)")
-
-    db.collection("users")
-      .document(uid)
-      .getDocument { [weak self] snap, error in
-        if let error = error {
-          print("❌ Firestore getDocument error:", error)
-          return
+    
+    // MARK: – Profile
+    private func fetchUserProfile() {
+        guard let uid = auth.currentUser?.uid else {
+            errorMessage = "Unable to get user UID"
+            return
         }
-        guard let data = snap?.data() else {
-          print("⚠️ Document exists? \(snap?.exists ?? false). Data nil.")
-          return
+        db.collection("users").document(uid).getDocument { [weak self] snap, err in
+            DispatchQueue.main.async {
+                if let err = err { self?.errorMessage = err.localizedDescription; return }
+                guard let data = snap?.data() else { self?.errorMessage = "Profile not found"; return }
+                
+                self?.displayName = data["username"] as? String ?? "Unknown User"
+                self?.city        = data["city"]     as? String ?? ""
+                if let ts = data["registrationDate"] as? Timestamp {
+                    self?.registrationDate = ts.dateValue()
+                }
+            }
         }
-        print("✅ Fetched data:", data)
-
-        DispatchQueue.main.async {
-          self?.displayName = data["username"] as? String ?? "<no-name>"
-          self?.city        = data["city"]     as? String ?? "<no-city>"
-        }
-      }
-  }
+    }
+    
+    // MARK: – Saved / purchased routes
+    /// Reads `users/{uid}/savedRoutes` (doc IDs = route IDs) and loads corresponding docs from `routes` collection
+    private func fetchSavedRoutes() {
+        guard let uid = auth.currentUser?.uid else { return }
+        
+        db.collection("users")
+            .document(uid)
+            .collection("savedRoutes")
+            .getDocuments { [weak self] snap, err in
+                
+                if let err = err {
+                    DispatchQueue.main.async { self?.errorMessage = err.localizedDescription }
+                    return
+                }
+                
+                // routeId → (savedAt, isPurchased)
+                var meta: [String: (Date?, Bool)] = [:]
+                snap?.documents.forEach { doc in
+                    let data = doc.data()
+                    let date = (data["savedAt"] as? Timestamp)?.dateValue()
+                    let paid = data["isPurchased"] as? Bool ?? false
+                    meta[doc.documentID] = (date, paid)
+                }
+                
+                let ids = Array(meta.keys)
+                guard !ids.isEmpty else {
+                    DispatchQueue.main.async { self?.routes = [] }
+                    return
+                }
+                
+                // Firestore `in` accepts ≤10 IDs
+                let chunks = stride(from: 0, to: ids.count, by: 10)
+                    .map { Array(ids[$0..<min($0 + 10, ids.count)]) }
+                
+                var collected: [SavedRoute] = []
+                let group = DispatchGroup()
+                
+                for chunk in chunks {
+                    group.enter()
+                    self?.db.collection("routes")
+                        .whereField(FieldPath.documentID(), in: chunk)
+                        .getDocuments { qs, _ in
+                            qs?.documents.forEach { doc in
+                                let d = doc.data()
+                                
+                                let route = TourRoute(
+                                    id:          doc.documentID,
+                                    title:       d["title"]        as? String ?? "Untitled",
+                                    authorUID:   d["authorUID"]    as? String ?? "",
+                                    rating:      d["rating"]       as? Double ?? 0,
+                                    reviewCount: d["reviewCount"]  as? Int ?? 0,
+                                    duration:    d["duration"]     as? Double ?? 0,
+                                    tags:        (d["tags"] as? [Any])?.compactMap { $0 as? String } ?? [],
+                                    price:       d["price"]        as? Double,
+                                    thumbnailURL:(d["thumbnailURL"] as? String).flatMap(URL.init),
+                                    stopsCount:  d["stopsCount"]   as? Int ?? 0
+                                )
+                                
+                                collected.append(
+                                    SavedRoute(
+                                        route:       route,
+                                        savedAt:     meta[doc.documentID]?.0,
+                                        isPurchased: meta[doc.documentID]?.1 ?? false
+                                    )
+                                )
+                            }
+                            group.leave()
+                        }
+                }
+                
+                group.notify(queue: .main) {
+                    self?.routes = collected.sorted {
+                        ($0.savedAt ?? .distantPast) > ($1.savedAt ?? .distantPast)
+                    }
+                }
+            }
+    }
 }
