@@ -36,7 +36,7 @@ struct ExploreCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             
-            //–– Cover (❌ без автора)
+            //–– Cover
             WebImage(url: route.thumbnailURL)
                 .resizable()
                 .scaledToFill()
@@ -114,7 +114,7 @@ struct ExploreCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 
                 Button {
-                    vm.toggleWish()
+                    vm.toggleWishlist()
                 } label: {
                     Image(systemName: vm.isWished ? "heart.fill" : "heart")
                         .font(.title3)

@@ -5,27 +5,20 @@ import MapboxDirections
 import CoreLocation
 
 final class TourDetailsViewModel: ObservableObject {
-    
-    // MARK: - Published state (UI-binding)
+    @Published var stops:      [Stop]                = []
+    @Published var isLoading                        = false
+    @Published var errorMsg:   String?              = nil
 
-    @Published var stops:        [Stop]                     = []
-    @Published var isLoading                             = false
-    @Published var errorMsg:      String?                 = nil
+    @Published var routeCoords: [CLLocationCoordinate2D] = []
+    @Published var isSaved                         = false
 
-    @Published var routeCoords:  [CLLocationCoordinate2D] = []
-    @Published var isSaved                               = false
-
-    @Published var myReview:     UserReview?              = nil
-    
-    // ──────────────────────────────────────────────
-    // MARK: - Private helpers
+    @Published var myReview:    UserReview?           = nil
 
     private let saveSvc   = SavedRoutesService()
     private let reviewSvc = ReviewService()
     private var currentRouteID: String?
-    
-    // ──────────────────────────────────────────────
-       // MARK: - Public API
+
+    /// Загружает сразу три сущности: сохранённость, отзыв и список стопов
     @MainActor
     func load(routeID: String) async {
         currentRouteID = routeID
@@ -35,134 +28,70 @@ final class TourDetailsViewModel: ObservableObject {
         async let stops  = fetchStops(routeID: routeID)               // throws
 
         do {
-            let savedResult = await saved
+            let savedResult  = await saved
             let reviewResult = try await review
-            let stopsResult = try await stops
-            
-            isSaved = savedResult
+            let stopsResult  = try await stops
+
+            isSaved  = savedResult
             myReview = reviewResult
             self.stops = stopsResult
-            
+
         } catch {
             errorMsg = error.localizedDescription
         }
     }
-    
-    /// Save the whole route to “Your Routes”
+
+    /// Сохраняет маршрут (отмечает `isSaved = true` в профиле)
     func saveRoute() async {
         guard let id = currentRouteID, !isSaved else { return }
         do {
             try await saveSvc.save(routeID: id)
-            isSaved = true           // optimistic UI update
+            isSaved = true
         } catch {
             errorMsg = error.localizedDescription
         }
     }
-    
-    /// Create **or** update review (if one already exists)
+
+    /// Сохраняет новый отзыв или обновляет существующий (upsert)
     @MainActor
     func saveReview(_ review: UserReview) async {
         do {
-            // upsert = create OR update
             myReview = try await reviewSvc.upsert(review: review)
         } catch {
             print("⚠️ Review save:", error)
         }
     }
 
-    
-    // ──────────────────────────────────────────────
-    // MARK: - Private helpers
+    // MARK: — private helpers
+
     private func fetchMyReview(routeID: String) async throws -> UserReview? {
         try await reviewSvc.fetchMyReview(routeID: routeID)
     }
 
-    /// Async re-implementation of the old callback version
+    /// callback → async/await обёртка
     private func fetchStops(routeID: String) async throws -> [Stop] {
         try await withCheckedThrowingContinuation { cont in
             FirestoreService.shared.fetchStops(for: routeID) { result in
                 switch result {
-                case .success(let stops): cont.resume(returning: stops)
-                case .failure(let err)  : cont.resume(throwing: err)
+                case .success(let stops):  cont.resume(returning: stops)
+                case .failure(let err):    cont.resume(throwing: err)
                 }
             }
         }
     }
-    
-    
-    
-    
-    
-//    func loadMyReview(routeID: String) async {
-//        do {
-//            myReview = try await reviewSvc.fetchMyReview(routeID: routeID)
-//        } catch {
-//            print("⚠️ Review load:", error)
-//        }
-//    }
 
-//    // 3) create / update в одной точке
-//    @MainActor
-//    func saveReview(_ review: UserReview) async {
-//        do {
-//            if myReview == nil {
-//                try await reviewSvc.create(review: review)
-//            } else {
-//                try await reviewSvc.update(review: review)
-//            }
-//            myReview = review                   // обновляем паблишед-свойство
-//        } catch {
-//            print("⚠️ Review save:", error)
-//        }
-//    }
-
-//    func load(routeID: String) async {
-//        currentRouteID = routeID
-//        isSaved = await saveSvc.isSaved(routeID: routeID)
-//        // plus existing loadStops…
-//    }
-
-//    @MainActor
-//    func save() async {
-//        guard let id = currentRouteID else { return }
-//        try? await saveSvc.save(routeID: id)
-//        isSaved = true
-//    }
-//
-//
-//    /// Loads all stops for a given route (sub-collection `/stops`)
-//    func loadStops(routeID: String) {
-//        isLoading = true; errorMsg = nil
-//        FirestoreService.shared.fetchStops(for: routeID) { [weak self] res in
-//            DispatchQueue.main.async {
-//                self?.isLoading = false
-//                switch res {
-//                case .success(let s): self?.stops = s
-//                case .failure(let e): self?.errorMsg = e.localizedDescription
-//                }
-//            }
-//        }
-//    }
-    
     func buildWalkingRoute() {
         let wps = stops.map { Waypoint(coordinate: $0.coordinates.clCoord) }
-        
-        let opts = RouteOptions(waypoints: wps,
-                               profileIdentifier: .walking)
+        let opts = RouteOptions(waypoints: wps, profileIdentifier: .walking)
         opts.includesSteps = false
-        opts.routeShapeResolution = .full     // нужны все точки поли-линии
-        
-        Directions.shared.calculate(opts) { [weak self] wps, routes, error in
+        opts.routeShapeResolution = .full
+
+        Directions.shared.calculate(opts) { [weak self] _, routes, error in
             if let error = error {
                 print("❌ Directions error:", error)
                 return
             }
-            
-            guard
-                let route = routes?.first,
-                let coords = route.coordinates  // Use coordinates directly from the route
-            else { return }
-            
+            guard let route = routes?.first, let coords = route.coordinates else { return }
             self?.routeCoords = coords
         }
     }

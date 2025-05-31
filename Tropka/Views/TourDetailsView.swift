@@ -4,46 +4,46 @@ import MapboxMaps
 
 // MARK: – Route details ▸ экран одного маршрута
 struct TourDetailsView: View {
-
     let route: TourRoute
     @StateObject private var vm = TourDetailsViewModel()
 
     @State private var showMap         = false
     @State private var showReviewSheet = false
 
-    // MARK: CTA – Save / Buy button
+    // MARK: Save / Buy
     @ViewBuilder
-    private var saveBuyButton: some View {
-        if route.isFree {
-            Button {
-                Task {
-                    if !vm.isSaved {          // ← обычное свойство, без $
-                        await vm.saveRoute()  // ← новое имя метода
+        private var saveBuyButton: some View {
+            if vm.isSaved {
+            }
+            else {
+                if route.isActuallyFree {
+                    Button {
+                        Task {
+                            await vm.saveRoute()
+                        }
+                    } label: {
+                        Text(vm.isSaved ? "Saved" : "Get for free")
+                            .frame(maxWidth: .infinity, minHeight: 48)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(vm.isSaved)
                 }
-            } label: {
-                Text(vm.isSaved ? "Saved" : "Get for free")
-                    .frame(maxWidth: .infinity, minHeight: 48)
+                else {
+                    Button {
+                        // TODO: payment flow
+                    } label: {
+                        Text(String(format: "Buy €%.2f", route.price ?? 0))
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .disabled(vm.isSaved)
-
-        } else {
-            Button {
-                // TODO: payment flow
-            } label: {
-                Text(String(format: "Buy €%.2f", route.price ?? 0))
-                    .frame(maxWidth: .infinity, minHeight: 48)
-            }
-            .buttonStyle(.borderedProminent)
         }
-    }
-
 
     // MARK: Review button
     @ViewBuilder
     private var reviewButton: some View {
-        if vm.isSaved {                       // ← доступна только после Save / Buy
+        if vm.isSaved {
             Button { showReviewSheet = true } label: {
                 Label(
                     vm.myReview == nil ? "Write a review" : "Edit your review",
@@ -55,12 +55,11 @@ struct TourDetailsView: View {
         }
     }
 
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
 
-                // Thumbnail
+                // –– Thumbnail
                 if let url = route.thumbnailURL {
                     WebImage(url: url)
                         .resizable()
@@ -70,9 +69,10 @@ struct TourDetailsView: View {
                         .shadow(radius: 6, y: 3)
                 }
 
-                // Title + author
+                // –– Title + author
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(route.title).font(.title2).bold()
+                    Text(route.title)
+                        .font(.title2).bold()
                     Text("by \(route.authorUID)")
                         .foregroundColor(.secondary)
                         .font(.subheadline)
@@ -80,7 +80,7 @@ struct TourDetailsView: View {
 
                 Divider()
 
-                // Stops list / loader / empty
+                // –– Stops / loader / empty
                 Group {
                     if vm.isLoading {
                         ProgressView("Loading stops…")
@@ -95,7 +95,7 @@ struct TourDetailsView: View {
                     }
                 }
 
-                // Map button
+                // –– Кнопка «Show on Map»
                 if !vm.stops.isEmpty {
                     Button {
                         showMap = true
@@ -106,10 +106,10 @@ struct TourDetailsView: View {
                     .buttonStyle(.borderedProminent)
                 }
 
-                // Save / Buy
+                // –– Save / Buy
                 saveBuyButton
 
-                // Review
+                // –– Review
                 reviewButton
             }
             .padding(20)
@@ -119,23 +119,26 @@ struct TourDetailsView: View {
                 await vm.load(routeID: route.id)
             }
         }
+        // –– Лист для Review
         .sheet(isPresented: $showReviewSheet) {
             ReviewFormSheet(
-                draft: vm.myReview               
-                    ?? UserReview(
-                        id: "",
-                        routeID: route.id,
-                        routeTitle: route.title,
-                        rating: 5,
-                        text: "",
-                        createdAt: .now
-                    )
-            ) { new in
-                Task { await vm.saveReview(new) }
+                draft: vm.myReview
+                  ?? UserReview(
+                         id: "",
+                         routeID: route.id,
+                         routeTitle: route.title,
+                         rating: 5,
+                         text: "",
+                         createdAt: .now
+                     )
+            ) { newReview in
+                Task {
+                    await vm.saveReview(newReview)
+                }
             }
         }
         .navigationDestination(isPresented: $showMap) {
-            RouteMapView(vm: vm)               // тот же ViewModel
+            RouteMapView(vm: vm)
         }
         .navigationTitle("Details")
         .navigationBarTitleDisplayMode(.inline)
