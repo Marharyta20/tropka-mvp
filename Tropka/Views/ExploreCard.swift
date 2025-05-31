@@ -63,10 +63,16 @@ struct ExploreCard: View {
                 .clipShape(Capsule())
             }
             
-            //–– Meta
+            //–– Meta (rating • duration)
             HStack(spacing: 8) {
-                Label(String(format: "%.1f", route.rating), systemImage: "star.fill")
-                Label(String(format: "%.1f h", route.duration), systemImage: "clock")
+                Label(
+                    String(format: "%.1f", route.rating),
+                    systemImage: "star.fill"
+                )
+                Label(
+                    String(format: "%.1f h", route.duration),
+                    systemImage: "clock"
+                )
             }
             .font(.caption)
             .foregroundColor(.secondary)
@@ -83,11 +89,12 @@ struct ExploreCard: View {
                 }
             }
             
-            //–– CTA + wishlist ───────────────────────────────────────
+            //–– CTA + wishlist
             HStack(spacing: 12) {
-                Button(vm.route.isActuallyFree
-                       ? (vm.isSaved ? "Saved" : "Get for free")
-                       : String(format: "Buy €%.2f", vm.route.price ?? 0)
+                Button(
+                    vm.route.isActuallyFree
+                    ? (vm.isSaved ? "Saved" : "Get for free")
+                    : String(format: "Buy €%.2f", vm.route.price ?? 0)
                 ) {
                     if vm.route.isActuallyFree {
                         Task {
@@ -95,7 +102,7 @@ struct ExploreCard: View {
                             showToast = true
                         }
                     } else {
-                        // TODO: payment
+                        // TODO: payment flow
                     }
                 }
                 .disabled(vm.route.isActuallyFree && vm.isSaved)
@@ -112,8 +119,8 @@ struct ExploreCard: View {
                     Image(systemName: vm.isWished ? "heart.fill" : "heart")
                         .font(.title3)
                         .padding(12)
-                        .foregroundColor(vm.isWished ? .red : .blue)
                 }
+                .foregroundColor(vm.isWished ? .red : .gray)
                 .background(Color(.systemGray6))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .buttonStyle(.plain)
@@ -125,6 +132,10 @@ struct ExploreCard: View {
                 .fill(Color(.systemBackground))
                 .shadow(color: .black.opacity(0.05), radius: 6, y: 3)
         )
-        .toast(isPresented: $showToast) { Text("Route added") }
+        .toast(isPresented: $showToast) {
+            Text("Route added")
+                .font(.subheadline)
+                .foregroundColor(.white)
+        }
     }
 }

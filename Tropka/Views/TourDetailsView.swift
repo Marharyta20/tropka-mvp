@@ -1,20 +1,25 @@
 import SwiftUI
 import SDWebImageSwiftUI
-import MapboxMaps   // на будущее — мини-карта для стопа
+import MapboxMaps
 
 // MARK: – Route details ▸ экран одного маршрута
 struct TourDetailsView: View {
+
     let route: TourRoute
     @StateObject private var vm = TourDetailsViewModel()
-    @State private var showMap = false
-    
-    // MARK: – CTA button
+
+    @State private var showMap         = false
+    @State private var showReviewSheet = false
+
+    // MARK: CTA – Save / Buy button
     @ViewBuilder
     private var saveBuyButton: some View {
         if route.isFree {
             Button {
                 Task {
-                    if !vm.isSaved { await vm.save() }
+                    if !vm.isSaved {          // ← обычное свойство, без $
+                        await vm.saveRoute()  // ← новое имя метода
+                    }
                 }
             } label: {
                 Text(vm.isSaved ? "Saved" : "Get for free")
@@ -34,11 +39,28 @@ struct TourDetailsView: View {
         }
     }
 
+
+    // MARK: Review button
+    @ViewBuilder
+    private var reviewButton: some View {
+        if vm.isSaved {                       // ← доступна только после Save / Buy
+            Button { showReviewSheet = true } label: {
+                Label(
+                    vm.myReview == nil ? "Write a review" : "Edit your review",
+                    systemImage: vm.myReview == nil ? "square.and.pencil" : "pencil"
+                )
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+    }
+
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
 
-                //–– Thumbnail ──────────────────────────────────────────────
+                // Thumbnail
                 if let url = route.thumbnailURL {
                     WebImage(url: url)
                         .resizable()
@@ -48,18 +70,17 @@ struct TourDetailsView: View {
                         .shadow(radius: 6, y: 3)
                 }
 
-                //–– Title + author
+                // Title + author
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(route.title)
-                        .font(.title2).bold()
-                    Text("by \(route.authorUID)")          // ← потом подтянем имя автора
+                    Text(route.title).font(.title2).bold()
+                    Text("by \(route.authorUID)")
                         .foregroundColor(.secondary)
                         .font(.subheadline)
                 }
 
                 Divider()
 
-                //–– Stops list / loader / empty
+                // Stops list / loader / empty
                 Group {
                     if vm.isLoading {
                         ProgressView("Loading stops…")
@@ -69,13 +90,12 @@ struct TourDetailsView: View {
                             .foregroundColor(.secondary)
                     } else {
                         VStack(spacing: 12) {
-                            ForEach(vm.stops) { stop in
-                                StopRow(stop: stop)
-                            }
+                            ForEach(vm.stops) { StopRow(stop: $0) }
                         }
                     }
                 }
-                //–– MAP BUTTON (открывает картy) ––––––––––––––––––––
+
+                // Map button
                 if !vm.stops.isEmpty {
                     Button {
                         showMap = true
@@ -86,25 +106,37 @@ struct TourDetailsView: View {
                     .buttonStyle(.borderedProminent)
                 }
 
-                //–– Save / Buy button
+                // Save / Buy
                 saveBuyButton
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .font(.headline)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                // Review
+                reviewButton
             }
             .padding(20)
         }
         .onAppear {
-            vm.loadStops(routeID: route.id)
+            Task {
+                await vm.load(routeID: route.id)
+            }
+        }
+        .sheet(isPresented: $showReviewSheet) {
+            ReviewFormSheet(
+                draft: vm.myReview               
+                    ?? UserReview(
+                        id: "",
+                        routeID: route.id,
+                        routeTitle: route.title,
+                        rating: 5,
+                        text: "",
+                        createdAt: .now
+                    )
+            ) { new in
+                Task { await vm.saveReview(new) }
+            }
         }
         .navigationDestination(isPresented: $showMap) {
-            RouteMapView(vm: vm)          // ← передаём тот же ViewModel
+            RouteMapView(vm: vm)               // тот же ViewModel
         }
-//        .sheet(isPresented: $showMap) {
-//            RouteMapView(vm: vm)
-//        }
         .navigationTitle("Details")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -113,32 +145,55 @@ struct TourDetailsView: View {
 // MARK: – Строка отдельного stop
 private struct StopRow: View {
     let stop: Stop
-
     var body: some View {
         HStack(spacing: 14) {
-
-            //–– фото точки (если есть)
             WebImage(url: stop.photoURL)
                 .resizable()
                 .scaledToFill()
                 .frame(width: 64, height: 64)
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-
-            //–– текст
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(stop.orderIndex). \(stop.name)")
                     .font(.body).bold()
-
-                // время + примечание
                 Text("≈ \(stop.timeSpent) min"
                      + (stop.notes?.isEmpty == false ? " · \(stop.notes!)" : ""))
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(2)
             }
-
             Spacer()
         }
     }
 }
 
+// MARK: – Review form sheet
+struct ReviewFormSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State var draft: UserReview
+    let onSave: (UserReview) -> Void
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Rating") {
+                    Picker("Rating", selection: $draft.rating) {
+                        ForEach(1...5, id: \.self) { Text("\($0)") }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                Section("Review") {
+                    TextEditor(text: $draft.text)
+                        .frame(height: 120)
+                }
+            }
+            .navigationTitle("Your review")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { onSave(draft); dismiss() }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
+            }
+        }
+    }
+}

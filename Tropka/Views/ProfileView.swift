@@ -5,12 +5,15 @@ import SwiftUI
 struct ProfileView: View {
     
     // MARK: state & VM
-    @StateObject private var vm            = ProfileViewModel()
-    @State private   var showSettings      = false
-    @State private   var selectedTab: Tab  = .routes
-    @Namespace private var underlineNS     // for animation
+    @StateObject private var vm = ProfileViewModel()
+    
+    @State private var showSettings  = false
+    @State private var selectedTab: Tab = .routes
+    @Namespace private var underlineNS
+    
     @State private var pendingDelete: SavedRoute?
     @State private var showDeleteConfirm = false
+    @State private var editingReview: UserReview?
     
     enum Tab { case routes, reviews, wishlist }
     
@@ -18,9 +21,7 @@ struct ProfileView: View {
     // MARK: body
     var body: some View {
         NavigationStack {
-            
             VStack(alignment: .leading, spacing: 20) {
-                
                 header
                 actionRow
                 tabBar
@@ -28,11 +29,15 @@ struct ProfileView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
-            
-            .navigationTitle("")              // empty = no title text
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $showSettings) {
                 SettingsView(profileVM: vm)
+            }
+        }
+        .sheet(item: $editingReview) { rev in
+            EditReviewSheet(draft: rev) { new in
+                Task { await vm.update(review: new) }
             }
         }
     }
@@ -108,104 +113,200 @@ struct ProfileView: View {
         .buttonStyle(.plain)
     }
     
-    // MARK: content
     @ViewBuilder
     private var tabContent: some View {
         switch selectedTab {
             
         case .routes:
+            routesList
+            
+        case .reviews:
+            reviewsList
+            
+        case .wishlist:
+            wishlistList
+        }
+    }
+    
+    // MARK: – Routes list
+    private var routesList: some View {
+        List {
+            ForEach(vm.routes) { item in
+                NavigationLink {
+                    SavedRouteMapScreen(routeID: item.route.id,
+                                        title:    item.route.title)
+                } label: {
+                    ProfileRouteCell(item: item, showStatus: true)
+                }
+                .swipeActions {
+                    Button(role: .destructive) {
+                        pendingDelete = item
+                        showDeleteConfirm = true
+                    } label: { Label("Remove", systemImage: "trash") }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .overlay {
             if vm.routes.isEmpty {
                 Text("No saved routes yet")
                     .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 120)
-            } else {
-                List {
-                    ForEach(vm.routes) { item in
-                        NavigationLink {
-                            SavedRouteMapScreen(routeID: item.route.id,
-                                                title:   item.route.title)
-                        } label: {
-                            ProfileRouteCell(item: item, showStatus: true)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                pendingDelete = item                 // remember which
-                                showDeleteConfirm = true             // show dialog
-                            } label: {
-                                Label("Remove", systemImage: "trash")
-                            }
-                        }
-                    }
-                }
-                .listStyle(.plain)
-                .confirmationDialog(
-                    "Remove this route?",
-                    isPresented: $showDeleteConfirm,
-                    titleVisibility: .visible
-                ) {
-                    Button("Delete", role: .destructive) {
-                        if let r = pendingDelete {
-                            Task { await vm.unsave(routeID: r.route.id) }
-                        }
-                    }
-                    Button("Cancel", role: .cancel) { pendingDelete = nil }
+            }
+        }
+        .confirmationDialog("Remove this route?",
+                            isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                if let r = pendingDelete {
+                    Task { await vm.unsave(routeID: r.route.id) }
                 }
             }
-            
-        case .reviews:
-            List {
-                ForEach(sampleReviews, id: \.title) { rev in
-                    ProfileReviewCell(title: rev.title, text: rev.text)
-                }
-            }
-            .listStyle(.plain)
-            
-        case .wishlist:
-            List(vm.wishlist) { item in
-                NavigationLink {
-                    SavedRouteMapScreen(routeID: item.route.id,
-                                        title:   item.route.title)
-                } label: {
-                    ProfileRouteCell(
-                        item: item,
-                        showStatus: false,
-                        onHeartTap: { vm.unwish(routeID: item.route.id) }   // 🧡
-                    )
-                }
-            }
-            .listStyle(.plain)
-            
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
         }
     }
     
+    // MARK: – Reviews list
+    private var reviewsList: some View {
+        List {
+            ForEach(vm.myReviews) { rev in
+                ReviewRow(review: rev)
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            Task { await vm.delete(review: rev) }
+                        } label: { Label("Delete", systemImage: "trash") }
+                        
+                        Button {
+                            editingReview = rev
+                        } label: { Label("Edit", systemImage: "pencil") }
+                    }
+            }
+        }
+        .listStyle(.plain)
+        .overlay {
+            if vm.myReviews.isEmpty {
+                Text("No reviews yet")
+                    .foregroundColor(.secondary)
+            }
+        }
+        .onAppear { vm.loadReviews() }
+    }
     
-    // placeholder reviews
-    private let sampleReviews: [(title: String, text: String)] = [
-        ("Hidden Cafés in Warsaw", "Coffee here is top-notch!"),
-        ("City Street Art Tour",   "Loved the colorful murals.")
-    ]
+    // MARK: – Wishlist list
+    private var wishlistList: some View {
+        List(vm.wishlist) { item in
+            NavigationLink {
+                SavedRouteMapScreen(routeID: item.route.id,
+                                    title:    item.route.title)
+            } label: {
+                ProfileRouteCell(
+                    item: item,
+                    showStatus: false,
+                    onHeartTap: { vm.unwish(routeID: item.route.id) }
+                )
+            }
+        }
+        .listStyle(.plain)
+        .overlay {
+            if vm.wishlist.isEmpty {
+                Text("No items yet")
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
 }
+
 
 
 // MARK: mini-screen that shows map of a saved route
-extension ProfileView {
-    struct SavedRouteMapScreen: View {
-        let routeID: String
-        let title: String
-        
-        @StateObject private var vm = TourDetailsViewModel()
-        
-        var body: some View {
-            RouteMapView(vm: vm)
-                .navigationTitle(title)
-                .onAppear {
-                    if vm.stops.isEmpty {
-                        vm.loadStops(routeID: routeID)
-                    }
+struct SavedRouteMapScreen: View {
+    let routeID: String
+    let title: String
+    
+    @StateObject private var vm = TourDetailsViewModel()
+    
+    var body: some View {
+        RouteMapView(vm: vm)
+            .navigationTitle(title)
+            .onAppear {
+                // если координаты ещё не подгружены – грузим всю модель
+                if vm.stops.isEmpty {
+                    Task { await vm.load(routeID: routeID) }
                 }
+            }
+    }
+}
+
+// MARK: – Row
+struct ReviewRow: View {
+    let review: UserReview
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(review.routeTitle).font(.headline)
+                Spacer()
+                Stars(rating: review.rating)   // helper below
+            }
+            Text(review.text)
+                .font(.body)
+                .foregroundColor(.secondary)
+                .lineLimit(3)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.03), radius: 2, y: 1)
+    }
+}
+
+// tiny star stack
+struct Stars: View {
+    let rating: Int
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(1...5, id:\.self) {
+                Image(systemName: $0 <= rating ? "star.fill" : "star")
+                    .foregroundColor(.yellow)
+                    .font(.caption2)
+            }
         }
     }
 }
+
+// MARK: – Edit sheet
+struct EditReviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State var draft: UserReview
+    let onSave: (UserReview) -> Void
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Rating") {
+                    Picker("Rating", selection: $draft.rating) {
+                        ForEach(1...5, id:\.self) { Text("\($0)") }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                Section("Review") {
+                    TextEditor(text: $draft.text)
+                        .frame(height: 120)
+                }
+            }
+            .navigationTitle("Edit Review")
+            .toolbar {
+                ToolbarItem(placement:.confirmationAction) {
+                    Button("Save") {
+                        onSave(draft); dismiss()
+                    }
+                }
+                ToolbarItem(placement:.cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                }
+            }
+        }
+    }
+}
+
 
 // MARK: route cell
 private struct ProfileRouteCell: View {

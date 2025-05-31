@@ -30,21 +30,28 @@ class ProfileViewModel: ObservableObject {
     private let db   = Firestore.firestore()
     private let auth = Auth.auth()
     
+    //saved
     private var cancellable: AnyCancellable?
     
+    //wishlist
     @Published var wishlist: [SavedRoute] = []
     private var wishCanc: AnyCancellable?
     private let wishlistSvc = WishlistService()
+    
+    //reviews
+    @Published var myReviews: [UserReview] = []
+    private let reviewSvc = ReviewService()
     
     init() {
         fetchUserProfile()
         fetchSavedRoutes()
         cancellable = SavedRoutesStore.shared.$savedIDs
             .sink { [weak self] _ in self?.fetchSavedRoutes() }
-        wishCanc = WishlistStore.shared.$ids
+        wishCanc = WishlistStore.shared.$wishIDs
             .sink { [weak self] ids in
                 Task { await self?.loadWishlist(ids: ids) }
             }
+        loadReviews()
     }
     
     // MARK: – Profile
@@ -145,18 +152,18 @@ class ProfileViewModel: ObservableObject {
                 }
             }
     }
-
+    
     func unsave(routeID: String) async {
         guard let uid = auth.currentUser?.uid else {
             errorMessage = "Unable to get user UID"
             return
         }
-
+        
         // optimistic UI update
         if let idx = routes.firstIndex(where: { $0.id == routeID }) {
-            _ = withAnimation { routes.remove(at: idx) }  
+            _ = withAnimation { routes.remove(at: idx) }
         }
-
+        
         do {
             try await db.collection("users")
                 .document(uid)
@@ -172,17 +179,17 @@ class ProfileViewModel: ObservableObject {
     @MainActor
     private func loadWishlist(ids: Set<String>) async {
         guard !ids.isEmpty else { wishlist = []; return }
-
+        
         let idArray = Array(ids)
         let chunks = stride(from: 0, to: idArray.count, by: 10)
             .map { Array(idArray[$0..<min($0+10, idArray.count)]) }
-
+        
         var collected: [SavedRoute] = []
         for chunk in chunks {
             if let qs = try? await db.collection("routes")
-                    .whereField(FieldPath.documentID(), in: chunk)
-                    .getDocuments() {
-
+                .whereField(FieldPath.documentID(), in: chunk)
+                .getDocuments() {
+                
                 for doc in qs.documents {
                     let d = doc.data()
                     let route = TourRoute(
@@ -209,6 +216,36 @@ class ProfileViewModel: ObservableObject {
     }
     
     func unwish(routeID: String) {
-            Task { try? await wishlistSvc.set(false, routeID: routeID) }
+        Task { try? await wishlistSvc.set(false, routeID: routeID) }
+    }
+    
+    func loadReviews() {
+        Task { @MainActor in
+            do   { myReviews = try await reviewSvc.fetchMyReviews() }
+            catch { errorMessage = error.localizedDescription }
         }
+    }
+
+    @MainActor
+    func update(review: UserReview) async {
+        myReviews = myReviews.map { $0.routeID == review.routeID ? review : $0 }
+        _ = try? await reviewSvc.upsert(review: review)
+    }
+
+    @MainActor
+    func delete(review: UserReview) async {
+        try? await reviewSvc.delete(review: review)
+        myReviews.removeAll { $0.routeID == review.routeID }
+    }
+    
+    @MainActor
+    func create(review: UserReview) async {
+        do {
+            try await reviewSvc.create(review: review)
+            loadReviews()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
 }
