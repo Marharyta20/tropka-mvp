@@ -1,5 +1,6 @@
 import SwiftUI
 import MapboxMaps
+import CoreLocation
 
 /// UIKit wrapper for Mapbox Maps SDK that displays annotations for places.
 struct MapboxMapView: UIViewRepresentable {
@@ -13,9 +14,7 @@ struct MapboxMapView: UIViewRepresentable {
         let mv = MapView(frame: .zero, mapInitOptions: options)
         mv.location.options.puckType = .puck2D()
 
-        context.coordinator.annotationManager = mv.annotations.makePointAnnotationManager()
-        context.coordinator.mapView = mv
-        context.coordinator.onPinTapped = onPinTapped
+        context.coordinator.setup(with: mv, onPinTapped: onPinTapped)
         context.coordinator.updateAnnotations(with: places)
         return mv
     }
@@ -25,10 +24,38 @@ struct MapboxMapView: UIViewRepresentable {
         context.coordinator.updateAnnotations(with: places)
     }
 
-    class Coordinator {
+    class Coordinator: NSObject, CLLocationManagerDelegate {
         var annotationManager: PointAnnotationManager?
         weak var mapView: MapView?
         var onPinTapped: ((Place) -> Void)?
+
+        private let locationManager = CLLocationManager()
+        private var hasCenteredOnUser = false
+
+        override init() {
+            super.init()
+            locationManager.delegate = self
+            NotificationCenter.default.addObserver(self,
+                                                   selector: #selector(handleZoomIn),
+                                                   name: .zoomIn,
+                                                   object: nil)
+            NotificationCenter.default.addObserver(self,
+                                                   selector: #selector(handleZoomOut),
+                                                   name: .zoomOut,
+                                                   object: nil)
+        }
+
+        func setup(with mapView: MapView, onPinTapped: @escaping (Place) -> Void) {
+            self.mapView = mapView
+            self.annotationManager = mapView.annotations.makePointAnnotationManager()
+            self.onPinTapped = onPinTapped
+            locationManager.requestWhenInUseAuthorization()
+            locationManager.startUpdatingLocation()
+
+            if let loc = locationManager.location {
+                centerOnUser(loc)
+            }
+        }
 
         func updateAnnotations(with places: [Place]) {
             guard let manager = annotationManager else { return }
@@ -62,6 +89,42 @@ struct MapboxMapView: UIViewRepresentable {
                     icon.draw(in: iconRect)
                 }
             }
+        }
+
+        // MARK: - Zoom Handling
+
+        @objc private func handleZoomIn() {
+            changeZoom(by: 1)
+        }
+
+        @objc private func handleZoomOut() {
+            changeZoom(by: -1)
+        }
+
+        private func changeZoom(by delta: CGFloat) {
+            guard let mapView else { return }
+            let current = mapView.cameraState.zoom
+            let options = CameraOptions(zoom: current + Double(delta))
+            mapView.mapboxMap.setCamera(to: options)
+        }
+
+        // MARK: - Location
+
+        func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+            if status == .authorizedWhenInUse || status == .authorizedAlways {
+                manager.startUpdatingLocation()
+            }
+        }
+
+        func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+            guard !hasCenteredOnUser, let location = locations.last else { return }
+            centerOnUser(location)
+            hasCenteredOnUser = true
+        }
+
+        private func centerOnUser(_ location: CLLocation) {
+            let options = CameraOptions(center: location.coordinate, zoom: 14)
+            mapView?.mapboxMap.setCamera(to: options)
         }
     }
 }
