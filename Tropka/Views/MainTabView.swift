@@ -24,12 +24,12 @@ struct MainTabView: View {
                 .tag(Tab.map)
 
 
-            RoutesListView()
-                .tabItem {
-                    Image(systemName: "list.bullet")
-                    Text("Routes")
-                }
-                .tag(Tab.routes)
+//            RoutesListView()
+//                .tabItem {
+//                    Image(systemName: "list.bullet")
+//                    Text("Routes")
+//                }
+//                .tag(Tab.routes)
 
             CreatorView()
                 .tabItem {

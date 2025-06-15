@@ -1,7 +1,6 @@
 import Foundation
-import FirebaseFirestoreSwift
 
-struct TipPage: Identifiable, Codable {
+struct TipPage: Identifiable {
     let id: String
     let imageURL: String
     let header: String
@@ -9,9 +8,9 @@ struct TipPage: Identifiable, Codable {
     let footer: String?
 }
 
-struct Tip: Identifiable, Codable {
-    @DocumentID var id: String?
+struct Tip: Identifiable {
+    let id: String
     let title: String
     let bannerURL: String
-    let pages: [TipPage]
+    var pages: [TipPage] = []
 }
