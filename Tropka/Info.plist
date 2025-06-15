@@ -4,7 +4,9 @@
 <dict>
 	<key>MBXAccessToken</key>
 	<string>pk.eyJ1IjoidHJhdmVsYXBwLWNvbSIsImEiOiJjbWFpNDk3cWcwaWZqMmtzNzBsZmh0eG9rIn0.SMeV0YAQGa0riQZ9jvc5aQ</string>
-	<key>MGLMapboxAccessToken</key>
-	<string>pk.eyJ1IjoidHJhdmVsYXBwLWNvbSIsImEiOiJjbWFpNDk3cWcwaWZqMmtzNzBsZmh0eG9rIn0.SMeV0YAQGa0riQZ9jvc5aQ</string>
+        <key>MGLMapboxAccessToken</key>
+        <string>pk.eyJ1IjoidHJhdmVsYXBwLWNvbSIsImEiOiJjbWFpNDk3cWcwaWZqMmtzNzBsZmh0eG9rIn0.SMeV0YAQGa0riQZ9jvc5aQ</string>
+        <key>NSLocationWhenInUseUsageDescription</key>
+        <string>This app needs your location to show where you are on the map.</string>
 </dict>
 </plist>
