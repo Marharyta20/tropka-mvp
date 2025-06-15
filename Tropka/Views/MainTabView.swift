@@ -4,7 +4,7 @@ struct MainTabView: View {
     @State private var selection: Tab = .routes
 
     enum Tab {
-        case explore, map, routes, profile
+        case explore, map, routes, tips, profile
     }
 
     var body: some View {
@@ -23,12 +23,20 @@ struct MainTabView: View {
                 }
                 .tag(Tab.map)
 
+
             RoutesListView()
                 .tabItem {
                     Image(systemName: "list.bullet")
                     Text("Routes")
                 }
                 .tag(Tab.routes)
+
+            CreatorView()
+                .tabItem {
+                    Image(systemName: "lightbulb")
+                    Text("Tips")
+                }
+                .tag(Tab.tips)
 
             ProfileView()
                 .tabItem {
