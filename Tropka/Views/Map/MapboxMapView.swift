@@ -103,7 +103,7 @@ struct MapboxMapView: UIViewRepresentable {
 
         private func changeZoom(by delta: CGFloat) {
             guard let mapView else { return }
-            let current = mapView.cameraState.zoom
+            let current = mapView.mapboxMap.cameraState.zoom
             let options = CameraOptions(zoom: current + Double(delta))
             mapView.mapboxMap.setCamera(to: options)
         }

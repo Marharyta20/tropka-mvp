@@ -102,7 +102,7 @@ struct PlaceBottomSheet: View {
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(place.tags, id: \._self) { tag in
+                        ForEach(place.tags, id: \.self) { tag in
                             Text("#\(tag)")
                                 .font(.caption)
                                 .padding(.horizontal, 12)

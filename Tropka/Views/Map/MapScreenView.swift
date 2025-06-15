@@ -57,7 +57,7 @@ struct MapScreenView: View {
 
                 TextField("Search places...", text: $searchText)
                     .textFieldStyle(.plain)
-                    .onChange(of: searchText) { _ in
+                    .onChange(of: searchText) {
                         vm.searchQuery = searchText
                     }
 

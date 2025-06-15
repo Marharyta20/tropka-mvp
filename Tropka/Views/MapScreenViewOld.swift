@@ -2,7 +2,7 @@ import SwiftUI
 import MapboxMaps
 import CoreLocation
 
-struct MapScreenView: UIViewRepresentable {
+struct MapScreenViewOld: UIViewRepresentable {
     /// Если вам нужны кастомные пины — используйте stops, иначе можно оставить пустым
     var stops: [CLLocationCoordinate2D] = []
 
@@ -51,10 +51,10 @@ struct MapScreenView: UIViewRepresentable {
     // MARK: — Coordinator
 
     class Coordinator: NSObject, CLLocationManagerDelegate {
-        let parent: MapScreenView
+        let parent: MapScreenViewOld
         let locationManager = CLLocationManager()
 
-        init(_ parent: MapScreenView) {
+        init(_ parent: MapScreenViewOld) {
             self.parent = parent
             super.init()
             locationManager.delegate = self
