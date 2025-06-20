@@ -3,62 +3,87 @@ import FirebaseFirestore
 
 @MainActor
 final class TipsViewModel: ObservableObject {
-    @Published var tips: [Tip] = []
-    @Published var isLoading = false
+
+    // UI-binding
+    @Published var tips:          [Tip] = []
+    @Published var isLoading        = false
+    @Published var isLoadingMore    = false
     @Published var errorMessage: String?
 
-    private let db = Firestore.firestore()
+    private let db      = Firestore.firestore()
+    private var lastDoc: DocumentSnapshot?          // cursor
 
-    /// Fetch all tips + their pages
-    func loadTips() async {
-        isLoading = true
+    // MARK: first page
+    func reload() async {
+        guard !isLoading else { return }
+        isLoading  = true
         errorMessage = nil
+        defer { isLoading = false }
 
         do {
-            let topSnap = try await db.collection("tips").getDocuments()
-            var loaded: [Tip] = []
+            let snap = try await db.collection("tips")
+                                   .order(by: "title")        // индекс!
+                                   .limit(to: 10)
+                                   .getDocuments()
 
-            for doc in topSnap.documents {
-                let data = doc.data()
-                let tipID     = doc.documentID
-                let title     = data["title"]     as? String ?? ""
-                let bannerURL = data["bannerURL"] as? String ?? ""
-
-                // Build initial Tip
-                var tip = Tip(
-                    id:        tipID,
-                    title:     title,
-                    bannerURL: bannerURL,
-                    pages:     []
-                )
-
-                // Now load pages sub-collection
-                let pagesSnap = try await db
-                    .collection("tips")
-                    .document(tipID)
-                    .collection("pages")
-                    .getDocuments()
-
-                tip.pages = pagesSnap.documents.map { pdoc in
-                    let pd = pdoc.data()
-                    return TipPage(
-                        id:       pdoc.documentID,
-                        imageURL: pd["imageURL"] as? String ?? "",
-                        header:   pd["header"]   as? String ?? "",
-                        body:     pd["body"]     as? String ?? "",
-                        footer:   pd["footer"]   as? String
-                    )
-                }
-
-                loaded.append(tip)
-            }
-
-            tips = loaded
+            tips     = try await parse(snapshot: snap)
+            lastDoc  = snap.documents.last
 
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
 
-        isLoading = false
+    // MARK: next page
+    func fetchMore() async {
+        guard !isLoadingMore, let last = lastDoc else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        do {
+            let snap = try await db.collection("tips")
+                                   .order(by: "title")
+                                   .start(afterDocument: last)
+                                   .limit(to: 10)
+                                   .getDocuments()
+
+            let more = try await parse(snapshot: snap)
+            tips.append(contentsOf: more)
+            lastDoc = snap.documents.last
+
+        } catch {
+            print("🔥 Pagination error:", error)
+        }
+    }
+
+    // MARK: helper
+    private func parse(snapshot: QuerySnapshot) async throws -> [Tip] {
+        var result: [Tip] = []
+
+        for doc in snapshot.documents {
+            let data       = doc.data()
+            let tipID      = doc.documentID
+            let title      = data["title"]     as? String ?? ""
+            let bannerURL  = data["bannerURL"] as? String ?? ""
+
+            var tip = Tip(id: tipID, title: title, bannerURL: bannerURL)
+
+            // load pages
+            let pagesSnap = try await db.collection("tips")
+                                        .document(tipID)
+                                        .collection("pages")
+                                        .getDocuments()
+
+            tip.pages = pagesSnap.documents.map { p in
+                let pd = p.data()
+                return TipPage(id: p.documentID,
+                               imageURL: pd["imageURL"] as? String ?? "",
+                               header:   pd["header"]   as? String ?? "",
+                               body:     pd["body"]     as? String ?? "",
+                               footer:   pd["footer"]   as? String)
+            }
+            result.append(tip)
+        }
+        return result
     }
 }
