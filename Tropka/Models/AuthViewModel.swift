@@ -1,31 +1,69 @@
-import Foundation
+import SwiftUI
 import FirebaseAuth
-import Combine
 
-final class AuthViewModel: ObservableObject {
-  @Published var isSignedIn = false
-  private var handle: AuthStateDidChangeListenerHandle?
-
-  init() {
-    handle = AuthService.shared.observeAuthState { [weak self] user in
-      DispatchQueue.main.async {
-        self?.isSignedIn = (user != nil)
-      }
+class AuthViewModel: ObservableObject {
+    @Published var email = ""
+    @Published var password = ""
+    @Published var fullName = "" // Теперь это fullName
+    
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    @Published var isAuthenticated = false
+    
+    init() {
+        self.isAuthenticated = Auth.auth().currentUser != nil
     }
-  }
-  deinit {
-    if let h = handle { AuthService.shared.removeListener(h) }
-  }
-
-  func signUp(email: String, password: String) async throws {
-    _ = try await AuthService.shared.signUp(email: email, password: password)
-  }
-
-  func signIn(email: String, password: String) async throws {
-    _ = try await AuthService.shared.signIn(email: email, password: password)
-  }
-
-  func signOut() throws {
-    try AuthService.shared.signOut()
-  }
+    
+    func register() {
+        guard !email.isEmpty, !password.isEmpty, !fullName.isEmpty else {
+            errorMessage = "Please fill in all fields"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        // Передаем fullName
+        AuthService.shared.signUp(email: email, password: password, fullName: fullName) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isLoading = false
+                switch result {
+                case .success:
+                    self?.isAuthenticated = true
+                case .failure(let error):
+                    self?.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+    
+    func login() {
+        guard !email.isEmpty, !password.isEmpty else {
+            errorMessage = "Please enter email and password"
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        AuthService.shared.signIn(email: email, password: password) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isLoading = false
+                switch result {
+                case .success:
+                    self?.isAuthenticated = true
+                case .failure(let error):
+                    self?.errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+    
+    func signOut() {
+        AuthService.shared.signOut()
+        self.isAuthenticated = false
+        self.email = ""
+        self.password = ""
+        self.fullName = ""
+    }
 }

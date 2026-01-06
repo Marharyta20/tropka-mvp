@@ -1,43 +1,79 @@
 import SwiftUI
 
 struct LoginView: View {
-  @ObservedObject var authVM: AuthViewModel
-  @State private var email = ""
-  @State private var password = ""
-  @State private var error: String?
+    @ObservedObject var authVM: AuthViewModel
+    @State private var isSignUpMode = false
 
-  var body: some View {
-    VStack(spacing: 20) {
-      TextField("Email", text: $email)
-        .textFieldStyle(.roundedBorder)
-        .autocapitalization(.none)
-      SecureField("Password", text: $password)
-        .textFieldStyle(.roundedBorder)
+    var body: some View {
+        VStack(spacing: 20) {
+            
+            Text(isSignUpMode ? "Create Account" : "Welcome!")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+                .padding(.bottom, 20)
 
-      if let error {
-        Text(error).foregroundColor(.red).multilineTextAlignment(.center)
-      }
+            if isSignUpMode {
+                // Привязка к fullName
+                TextField("Full Name", text: $authVM.fullName)
+                    .textFieldStyle(.roundedBorder)
+                    .autocapitalization(.words)
+                    .transition(.opacity)
+            }
 
-      Button("Sign In") {
-        Task {
-          do {
-            try await authVM.signIn(email: email, password: password)
-          } catch {
-            self.error = error.localizedDescription
-          }
+            TextField("Email", text: $authVM.email)
+                .textFieldStyle(.roundedBorder)
+                .autocapitalization(.none)
+                .keyboardType(.emailAddress)
+
+            SecureField("Password", text: $authVM.password)
+                .textFieldStyle(.roundedBorder)
+
+            if let error = authVM.errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+            }
+            
+            if authVM.isLoading {
+                ProgressView()
+            }
+
+            Button(action: {
+                UIApplication.shared.endEditing()
+                if isSignUpMode {
+                    authVM.register()
+                } else {
+                    authVM.login()
+                }
+            }) {
+                Text(isSignUpMode ? "Sign Up" : "Log In")
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(10)
+            }
+            .disabled(authVM.isLoading)
+            .padding(.top, 10)
+
+            Button(action: {
+                withAnimation {
+                    isSignUpMode.toggle()
+                    authVM.errorMessage = nil
+                }
+            }) {
+                Text(isSignUpMode ? "Already have an account? Log In" : "Don't have an account? Sign Up")
+                    .foregroundColor(.blue)
+            }
         }
-      }
-
-      Button("Sign Up") {
-        Task {
-          do {
-            try await authVM.signUp(email: email, password: password)
-          } catch {
-            self.error = error.localizedDescription
-          }
-        }
-      }
+        .padding()
+        .animation(.default, value: isSignUpMode)
     }
-    .padding()
-  }
+}
+
+extension UIApplication {
+    func endEditing() {
+        sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 }
