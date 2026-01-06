@@ -3,7 +3,7 @@ import FirebaseFirestore   // for GeoPoint
 
 // MARK: - Route model (document in /routes)
 
-struct TourRoute: Identifiable {
+struct TourRoute: Identifiable, Equatable {
     /// Firestore document ID (parsed manually)
     let id: String
 

@@ -69,13 +69,10 @@ struct TourDetailsView: View {
                         .shadow(radius: 6, y: 3)
                 }
 
-                // –– Title + author
+                // –– Title
                 VStack(alignment: .leading, spacing: 4) {
                     Text(route.title)
                         .font(.title2).bold()
-                    Text("by \(route.authorUID)")
-                        .foregroundColor(.secondary)
-                        .font(.subheadline)
                 }
 
                 Divider()

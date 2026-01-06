@@ -7,9 +7,9 @@ struct RouteMapView: View {
     @ObservedObject var vm: TourDetailsViewModel
 
     // ― Mapbox managers, нужны как @State - обёртки для UIViewRepresentable
-    @State private var mapView:    MapView?
-    @State private var pinManager: PointAnnotationManager?
-    @State private var lineManager: PolylineAnnotationManager?
+    @State private var mapView:    MapboxMaps.MapView?
+    @State private var pinManager: MapboxMaps.PointAnnotationManager?
+    @State private var lineManager: MapboxMaps.PolylineAnnotationManager?
 
     var body: some View {
         ZStack(alignment: .bottom) {

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import MapboxMaps
 import CoreLocation
 import FirebaseFirestore
@@ -12,18 +13,19 @@ extension GeoPoint {
 }
 
 struct MapRepresentable: UIViewRepresentable {
+    typealias UIViewType = MapboxMaps.MapView
 
     // MARK: bindings для «наружи»
-    @Binding var mapView: MapView?
+    @Binding var mapView: MapboxMaps.MapView?
     @Binding var pinManager: PointAnnotationManager?
     @Binding var lineManager: PolylineAnnotationManager?
 
     let stops: [Stop]
     let routeCoords: [CLLocationCoordinate2D]
 
-    func makeUIView(context: Context) -> MapView {
+    func makeUIView(context: Context) -> MapboxMaps.MapView {
         let opts = MapInitOptions(styleURI: .streets)
-        let mv = MapView(frame: .zero, mapInitOptions: opts)
+        let mv = MapboxMaps.MapView(frame: CGRect.zero, mapInitOptions: opts)
 
         // сохраняем наружу
         DispatchQueue.main.async { mapView = mv }
@@ -42,7 +44,7 @@ struct MapRepresentable: UIViewRepresentable {
         return mv
     }
 
-    func updateUIView(_ uiView: MapView, context: Context) {
+    func updateUIView(_ uiView: MapboxMaps.MapView, context: Context) {
         // если пришёл новый массив остановок → перерисовать
         guard let pins = pinManager,
               let lines = lineManager else { return }
@@ -52,7 +54,7 @@ struct MapRepresentable: UIViewRepresentable {
     }
 
     // MARK: helpers
-    private func addAnnotations(on mv: MapView,
+    private func addAnnotations(on mv: MapboxMaps.MapView,
                                 pins: PointAnnotationManager,
                                 line: PolylineAnnotationManager) {
 
@@ -78,27 +80,44 @@ struct MapRepresentable: UIViewRepresentable {
             line.annotations = [poly]
         }
         
-        fitCamera(mv: mv, coords: coords)
-        
-        // ♦︎ FIT CAMERA to route  –––––––––––––––––––––––––––––––––––––
-        func fitCamera(mv: MapView, coords: [CLLocationCoordinate2D]) {
-                guard !coords.isEmpty else { return }
+        fitCamera(on: mv, coords: coords)
+    }
+    
+    // Fits camera to provided coordinates using Mapbox v10 API
+    private func fitCamera(on mv: MapboxMaps.MapView, coords: [CLLocationCoordinate2D]) {
+        guard !coords.isEmpty else { return }
 
-                do {
-                    let cam = try mv.mapboxMap.camera(
-                        for: coords,                                   // Geometry → coords
-                        camera: CameraOptions(center: nil, zoom: nil), // базовая (nil = “как есть”)
-                        coordinatesPadding: .init(top: 60,
-                                                  left: 40,
-                                                  bottom: 260,
-                                                  right: 40),
-                        maxZoom: nil,
-                        offset: .zero)
-                    mv.mapboxMap.setCamera(to: cam)
-                } catch {
-                    print("❌ camera-fit error:", error)
-                }
-            }
+        // Compute bounding box
+        var minLat = coords.first!.latitude
+        var maxLat = coords.first!.latitude
+        var minLon = coords.first!.longitude
+        var maxLon = coords.first!.longitude
 
+        for c in coords {
+            minLat = min(minLat, c.latitude)
+            maxLat = max(maxLat, c.latitude)
+            minLon = min(minLon, c.longitude)
+            maxLon = max(maxLon, c.longitude)
+        }
+
+        // Center of the bounds
+        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2.0,
+                                            longitude: (minLon + maxLon) / 2.0)
+
+        // Approximate zoom level based on longitude span and view width.
+        // This is a heuristic; Mapbox's exact fitting API isn't used here to avoid `mapboxMap` dependency.
+        let lonDelta = max(maxLon - minLon, 0.00001)
+        let viewWidth = max(Double(mv.bounds.width), 1.0)
+        // 256 is the tile size; clamp zoom between 0...20
+        var zoom = log2(360.0 * viewWidth / 256.0 / lonDelta)
+        if zoom.isNaN || !zoom.isFinite { zoom = 10 }
+        zoom = min(max(zoom, 0), 20)
+
+        // Apply some padding by reducing zoom a bit if we have multiple points
+        if coords.count > 1 { zoom -= 0.5 }
+
+        // Set camera instantly (no animation) to avoid race with initial layout
+        mv.camera.ease(to: CameraOptions(center: center, zoom: zoom), duration: 0)
     }
 }
+

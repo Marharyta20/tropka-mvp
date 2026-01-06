@@ -2,34 +2,135 @@ import SwiftUI
 
 struct ExploreView: View {
     @StateObject private var vm = ExploreViewModel()
-
+    
+    @State private var searchText = ""
+    @State private var showOnlyFree = false
+    @State private var selectedTag: String?
+    @State private var sortBy: SortOption = .rating
+    
+    enum SortOption: String, CaseIterable, Identifiable {
+        case rating = "Rating"
+        case price = "Price"
+        var id: String { self.rawValue }
+    }
+    
+    // — Фильтрованный массив
+    var filteredRoutes: [TourRoute] {
+        var result = vm.routes
+        
+        // Фильтр: поиск
+        if !searchText.isEmpty {
+            result = result.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
+        }
+        // Фильтр: бесплатные
+        if showOnlyFree {
+            result = result.filter { $0.isActuallyFree }
+        }
+        // Фильтр: по тегу
+        if let tag = selectedTag {
+            result = result.filter { $0.tags.contains(tag) }
+        }
+        // Сортировка
+        switch sortBy {
+        case .rating:
+            result = result.sorted { $0.rating > $1.rating }
+        case .price:
+            result = result.sorted { ($0.price ?? 0) < ($1.price ?? 0) }
+        }
+        return result
+    }
+    
+    // — Все доступные теги из списка маршрутов
+    var allTags: [String] {
+        Set(vm.routes.flatMap { $0.tags }).sorted()
+    }
+    
     var body: some View {
         NavigationView {
-            Group {
-                if vm.isLoading {
-                    ProgressView("Loading…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let msg = vm.errorMsg {
-                    ErrorBlock(message: msg) { vm.loadRoutes() }
-                } else {
-                    /// Обычный список «один-за-другим»
-                    ScrollView {
-                        LazyVStack(spacing: 24) {
-                            ForEach(vm.routes) { r in
-                                NavigationLink {
-                                                                TourDetailsView(route: r)   // ⬅️ передаём весь объект
-                                                            } label: {
-                                                                ExploreCard(route: r)
-                                                            }
-                                                            .buttonStyle(.plain)          // убираем эффект нажатия
-                            }
+            VStack(spacing: 10) {
+                // ——— Search bar
+                TextField("Search by route name", text: $searchText)
+                    .padding(10)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 16)
+                
+                // ——— Filters row
+                HStack(spacing: 8) {
+                    Toggle("Free only", isOn: $showOnlyFree)
+                        .font(.subheadline)
+                    
+                    Picker("Sort by", selection: $sortBy) {
+                        ForEach(SortOption.allCases) { sort in
+                            Text(sort.rawValue)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .padding(.bottom, 32)   // нижний отступ
                     }
-                    .refreshable { vm.loadRoutes() }   // pull-to-refresh
+                    .pickerStyle(.segmented)
+                    .frame(width: 170)
+                    
+                    Spacer()
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 4)
+                
+                // ——— Tag filter row
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        Button("All") {
+                            selectedTag = nil
+                        }
+                        .font(.caption)
+                        .foregroundColor(selectedTag == nil ? .white : .blue)
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(selectedTag == nil ? Color.blue : Color(.systemGray5))
+                        .clipShape(Capsule())
+                        
+                        ForEach(allTags, id: \.self) { tag in
+                            Button(tag.capitalized) {
+                                selectedTag = tag
+                            }
+                            .font(.caption)
+                            .foregroundColor(selectedTag == tag ? .white : .blue)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(selectedTag == tag ? Color.blue : Color(.systemGray5))
+                            .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+                
+                // ——— Main list
+                Group {
+                    if vm.isLoading {
+                        ProgressView("Loading…")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let msg = vm.errorMsg {
+                        ErrorBlock(message: msg) { vm.loadRoutes() }
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 24) {
+                                ForEach(filteredRoutes) { r in
+                                    NavigationLink {
+                                        TourDetailsView(route: r)
+                                    } label: {
+                                        ExploreCard(route: r)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                if filteredRoutes.isEmpty {
+                                    Text("No routes found.")
+                                        .foregroundColor(.secondary)
+                                        .padding(.top, 50)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .padding(.bottom, 32)
+                        }
+                        .refreshable { vm.loadRoutes() }
+                    }
+                }
+                .animation(.default, value: filteredRoutes)
             }
             .navigationTitle("Explore")
         }

@@ -1,9 +1,10 @@
 import SwiftUI
 import CoreLocation
 import MapboxMaps
+import FirebaseFirestore
 
 struct CreateEditRouteView: View {
-    enum Mode { case create, edit(routeID: String) }
+    enum Mode: Equatable { case create, edit(routeID: String) }
 
     let mode: Mode
 
@@ -14,7 +15,7 @@ struct CreateEditRouteView: View {
     @State private var errorMessage: String?
 
     // Map bindings for MapRepresentable
-    @State private var mapView: MapView?
+    @State private var mapView: MapboxMaps.MapView?
     @State private var pinManager: PointAnnotationManager?
     @State private var lineManager: PolylineAnnotationManager?
 
@@ -101,9 +102,15 @@ struct CreateEditRouteView: View {
 
     private func renumberStops() {
         stops = stops.enumerated().map { idx, s in
-            var copy = s
-            copy.orderIndex = idx + 1
-            return copy
+            Stop(
+                id: s.id,
+                name: s.name,
+                coordinates: s.coordinates,
+                orderIndex: idx + 1,
+                timeSpent: s.timeSpent,
+                photoURL: s.photoURL,
+                notes: s.notes
+            )
         }
     }
 
@@ -140,3 +147,4 @@ struct CreateEditRouteView: View {
 #Preview {
     CreateEditRouteView(mode: .create)
 }
+

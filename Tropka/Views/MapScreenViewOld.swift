@@ -1,8 +1,11 @@
+#if canImport(UIKit)
 import SwiftUI
 import MapboxMaps
 import CoreLocation
+import UIKit
 
 struct MapScreenViewOld: UIViewRepresentable {
+    typealias UIViewType = MapboxMaps.MapView
     /// Если вам нужны кастомные пины — используйте stops, иначе можно оставить пустым
     var stops: [CLLocationCoordinate2D] = []
 
@@ -10,32 +13,35 @@ struct MapScreenViewOld: UIViewRepresentable {
         Coordinator(self)
     }
 
-    func makeUIView(context: Context) -> MapView {
-        let options = MapInitOptions(styleURI: .streets)
-        let mapView = MapView(frame: .zero, mapInitOptions: options)
+    func makeUIView(context: Context) -> MapboxMaps.MapView {
+        let options = MapboxMaps.MapInitOptions(styleURI: .streets)
+        let mapView = MapboxMaps.MapView(frame: CGRect.zero, mapInitOptions: options)
         mapView.translatesAutoresizingMaskIntoConstraints = false
 
         // 1️⃣ show the 2D “puck”
-        mapView.location.options.puckType = .puck2D()
+        mapView.location.options.puckType = MapboxMaps.PuckType.puck2D()
 
         // 2️⃣ recenter on every location update (keep the subscription alive)
         _ = mapView.location.onLocationChange
-          .observeNext { [weak mapView] locations in
-            guard
-              let mapView = mapView,
-              let latest = locations.last
-            else { return }
-            let cam = CameraOptions(center: latest.coordinate, zoom: 14.0)
-            mapView.mapboxMap.setCamera(to: cam)
-          }
+            .observeNext { [weak mapView] (locations: [MapboxMaps.Location]) in
+                guard
+                    let mapView = mapView,
+                    let latest = locations.last
+                else { return }
+                let cam = MapboxMaps.CameraOptions(center: latest.coordinate, zoom: 14.0)
+                mapView.mapboxMap.setCamera(to: cam)
+            }
 
         // 3️⃣ now you request & start CoreLocation – as before
         context.coordinator.locationManager.requestWhenInUseAuthorization()
         context.coordinator.locationManager.startUpdatingLocation()
 
+        // keep a weak reference in coordinator for later camera updates
+        context.coordinator.mapView = mapView
+
         // 🔴 ADD: сразу после старта, если уже есть lastLocation – центрируемся раз
         if let loc = context.coordinator.locationManager.location {
-            let cam = CameraOptions(center: loc.coordinate, zoom: 14.0)
+            let cam = MapboxMaps.CameraOptions(center: loc.coordinate, zoom: 14.0)
             mapView.mapboxMap.setCamera(to: cam)
         }
 
@@ -44,7 +50,7 @@ struct MapScreenViewOld: UIViewRepresentable {
 
 
 
-    func updateUIView(_ uiView: MapView, context: Context) {
+    func updateUIView(_ uiView: MapboxMaps.MapView, context: Context) {
         // здесь можно, при желании, обновлять аннотации из stops
     }
 
@@ -53,6 +59,7 @@ struct MapScreenViewOld: UIViewRepresentable {
     class Coordinator: NSObject, CLLocationManagerDelegate {
         let parent: MapScreenViewOld
         let locationManager = CLLocationManager()
+        weak var mapView: MapboxMaps.MapView?
 
         init(_ parent: MapScreenViewOld) {
             self.parent = parent
@@ -91,20 +98,11 @@ struct MapScreenViewOld: UIViewRepresentable {
         }
 
         private func centerMap(on coord: CLLocationCoordinate2D) {
-            guard let mapView = findMapView() else { return }
-            let camera = CameraOptions(center: coord, zoom: 14.0)
+            guard let mapView = mapView else { return }
+            let camera = MapboxMaps.CameraOptions(center: coord, zoom: 14.0)
             mapView.mapboxMap.setCamera(to: camera)
-        }
-
-        private func findMapView() -> MapView? {
-            UIApplication.shared
-                .connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap { $0.windows }
-                .compactMap { $0.rootViewController?.view }
-                .flatMap { $0.subviews }
-                .compactMap { $0 as? MapView }
-                .first
         }
     }
 }
+#endif
+

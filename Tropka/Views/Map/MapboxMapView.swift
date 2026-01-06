@@ -4,14 +4,16 @@ import CoreLocation
 
 /// UIKit wrapper for Mapbox Maps SDK that displays annotations for places.
 struct MapboxMapView: UIViewRepresentable {
+    typealias UIViewType = MapboxMaps.MapView
+
     let places: [Place]
     var onPinTapped: (Place) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeUIView(context: Context) -> MapView {
+    func makeUIView(context: Context) -> MapboxMaps.MapView {
         let options = MapInitOptions(styleURI: .streets)
-        let mv = MapView(frame: .zero, mapInitOptions: options)
+        let mv = MapboxMaps.MapView(frame: .zero, mapInitOptions: options)
         mv.location.options.puckType = .puck2D()
 
         context.coordinator.setup(with: mv, onPinTapped: onPinTapped)
@@ -19,14 +21,14 @@ struct MapboxMapView: UIViewRepresentable {
         return mv
     }
 
-    func updateUIView(_ uiView: MapView, context: Context) {
+    func updateUIView(_ uiView: MapboxMaps.MapView, context: Context) {
         context.coordinator.onPinTapped = onPinTapped
         context.coordinator.updateAnnotations(with: places)
     }
 
     class Coordinator: NSObject, CLLocationManagerDelegate {
         var annotationManager: PointAnnotationManager?
-        weak var mapView: MapView?
+        weak var mapView: MapboxMaps.MapView?
         var onPinTapped: ((Place) -> Void)?
 
         private let locationManager = CLLocationManager()
@@ -45,7 +47,7 @@ struct MapboxMapView: UIViewRepresentable {
                                                    object: nil)
         }
 
-        func setup(with mapView: MapView, onPinTapped: @escaping (Place) -> Void) {
+        func setup(with mapView: MapboxMaps.MapView, onPinTapped: @escaping (Place) -> Void) {
             self.mapView = mapView
             self.annotationManager = mapView.annotations.makePointAnnotationManager()
             self.onPinTapped = onPinTapped
@@ -128,3 +130,4 @@ struct MapboxMapView: UIViewRepresentable {
         }
     }
 }
+

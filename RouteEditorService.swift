@@ -9,7 +9,7 @@ struct RouteEditorService {
     // MARK: Create
     /// Creates a new route document under `routes` and writes its stops under `routes/{routeID}/stops`.
     /// Returns the created route ID.
-    func createRoute(title: String, stops: [Stop]) async throws -> String {
+    func createRoute(title: String, tags: [String], price: Double?, thumbnailURL: URL?, stops: [Stop]) async throws -> String {
         guard let uid = auth.currentUser?.uid else { throw URLError(.userAuthenticationRequired) }
 
         let routeRef = db.collection("routes").document()
@@ -28,10 +28,11 @@ struct RouteEditorService {
             "rating": 0.0,
             "reviewCount": 0,
             "duration": durationHours,
-            "tags": [],
+            "tags": tags,
             "stopsCount": stopsCount
         ]
-        // Optional fields left out: price, thumbnailURL
+        if let price = price { routeData["price"] = price }
+        if let thumb = thumbnailURL?.absoluteString { routeData["thumbnailURL"] = thumb }
 
         try await db.runTransaction { txn, _ in
             txn.setData(routeData, forDocument: routeRef)
@@ -44,7 +45,7 @@ struct RouteEditorService {
 
     // MARK: Update
     /// Updates the route document and replaces its stops with the given array.
-    func updateRoute(routeID: String, title: String, stops: [Stop]) async throws {
+    func updateRoute(routeID: String, title: String, stops: [Stop], tags: [String], price: Double?, thumbnailURL: URL?) async throws {
         guard let uid = auth.currentUser?.uid else { throw URLError(.userAuthenticationRequired) }
         let routeRef = db.collection("routes").document(routeID)
 
@@ -53,12 +54,15 @@ struct RouteEditorService {
         let totalMinutes = stops.reduce(0) { $0 + max(0, $1.timeSpent) }
         let durationHours = Double(totalMinutes) / 60.0
 
-        let update: [String: Any] = [
+        var update: [String: Any] = [
             "title": title,
-            "authorUID": uid, // keep consistent
+            "authorUID": uid,
             "duration": durationHours,
-            "stopsCount": stopsCount
+            "stopsCount": stopsCount,
+            "tags": tags
         ]
+        if let price = price { update["price"] = price }
+        if let thumb = thumbnailURL?.absoluteString { update["thumbnailURL"] = thumb }
 
         try await routeRef.setData(update, merge: true)
         try await replaceStops(routeID: routeID, stops: stops)

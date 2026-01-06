@@ -14,6 +14,11 @@
 		A80584182DE34471006D041C /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A80584172DE34471006D041C /* FirebaseStorage */; };
 		A805841B2DE34566006D041C /* MapboxDirections in Frameworks */ = {isa = PBXBuildFile; productRef = A805841A2DE34566006D041C /* MapboxDirections */; };
 		A87F86D92DCB502700462F82 /* MapboxMaps in Frameworks */ = {isa = PBXBuildFile; productRef = A87F86D82DCB502700462F82 /* MapboxMaps */; };
+		A8818FC22F0D640C0068B9E9 /* MapboxSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8818FC12F0D640C0068B9E9 /* MapboxSearchService.swift */; };
+		A8818FC42F0D64120068B9E9 /* PlaceSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8818FC32F0D64120068B9E9 /* PlaceSearchView.swift */; };
+		A8818FC62F0D641F0068B9E9 /* CreateEditRouteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8818FC52F0D641F0068B9E9 /* CreateEditRouteView.swift */; };
+		A8818FC82F0D641F0068B9E9 /* CreateEditRouteView 2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8818FC72F0D641F0068B9E9 /* CreateEditRouteView 2.swift */; };
+		A8818FCA2F0D65430068B9E9 /* RouteEditorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8818FC92F0D65430068B9E9 /* RouteEditorService.swift */; };
 		A8C3440C2DDA4CF600ABB7C0 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = A8C3440B2DDA4CF600ABB7C0 /* SDWebImageSwiftUI */; };
 /* End PBXBuildFile section */
 
@@ -38,6 +43,11 @@
 		A87F86A12DCB4DE700462F82 /* Tropka.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tropka.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A87F86B12DCB4DE900462F82 /* TropkaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TropkaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A87F86BB2DCB4DE900462F82 /* TropkaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TropkaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A8818FC12F0D640C0068B9E9 /* MapboxSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapboxSearchService.swift; sourceTree = "<group>"; };
+		A8818FC32F0D64120068B9E9 /* PlaceSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceSearchView.swift; sourceTree = "<group>"; };
+		A8818FC52F0D641F0068B9E9 /* CreateEditRouteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEditRouteView.swift; sourceTree = "<group>"; };
+		A8818FC72F0D641F0068B9E9 /* CreateEditRouteView 2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CreateEditRouteView 2.swift"; sourceTree = "<group>"; };
+		A8818FC92F0D65430068B9E9 /* RouteEditorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteEditorService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -111,6 +121,11 @@
 				A87F86B42DCB4DE900462F82 /* TropkaTests */,
 				A87F86BE2DCB4DE900462F82 /* TropkaUITests */,
 				A87F86A22DCB4DE700462F82 /* Products */,
+				A8818FC12F0D640C0068B9E9 /* MapboxSearchService.swift */,
+				A8818FC32F0D64120068B9E9 /* PlaceSearchView.swift */,
+				A8818FC52F0D641F0068B9E9 /* CreateEditRouteView.swift */,
+				A8818FC72F0D641F0068B9E9 /* CreateEditRouteView 2.swift */,
+				A8818FC92F0D65430068B9E9 /* RouteEditorService.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -282,6 +297,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A8818FC62F0D641F0068B9E9 /* CreateEditRouteView.swift in Sources */,
+				A8818FC42F0D64120068B9E9 /* PlaceSearchView.swift in Sources */,
+				A8818FC82F0D641F0068B9E9 /* CreateEditRouteView 2.swift in Sources */,
+				A8818FCA2F0D65430068B9E9 /* RouteEditorService.swift in Sources */,
+				A8818FC22F0D640C0068B9E9 /* MapboxSearchService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

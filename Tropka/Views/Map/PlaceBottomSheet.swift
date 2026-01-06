@@ -190,11 +190,6 @@ struct CompactRouteCard: View {
                     .fontWeight(.medium)
 
                 HStack {
-                    Text(route.authorUID)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
 
                     if route.isFree {
                         Text("FREE")

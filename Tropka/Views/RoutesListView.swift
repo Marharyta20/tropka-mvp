@@ -9,11 +9,6 @@ struct RoutesListView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(route.title)
                         .font(.headline)
-
-                    // в модели сейчас authorUID – показываем его для примера
-                    Text("by \(route.authorUID)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
                 }
             }
             .navigationTitle("Routes")
