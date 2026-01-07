@@ -1,82 +1,91 @@
 import Foundation
 import FirebaseFirestore
+import CoreLocation
 
 final class FirestoreService {
     static let shared = FirestoreService()
-    private let db    = Firestore.firestore()
-
-    /// Загружаем public-маршруты (первые 50, отсортированы по createdAt)
-    func fetchExploreRoutes(
-        completion: @escaping (Result<[TourRoute], Error>) -> Void
-    ) {
-        db.collection("routes")
-          .order(by: "createdAt", descending: true)
-          .limit(to: 50)
-          .getDocuments { snap, err in
-
-              if let err = err {
-                  completion(.failure(err)); return
-              }
-
-              let routes = snap?.documents.compactMap(TourRoute.init(from:)) ?? []
-              completion(.success(routes))
-          }
-    }
+    private let db = Firestore.firestore()
     
-    func fetchStops(for routeID: String,
-                    completion: @escaping (Result<[Stop],Error>) -> Void) {
+    private init() {}
 
-        db.collection("routes")
-          .document(routeID)
-          .collection("stops")
-          .order(by: "orderIndex")
-          .getDocuments { snap, err in
-              if let err = err { return completion(.failure(err)) }
-              let stops = snap?.documents.compactMap { doc -> Stop? in
-                  let d = doc.data()
-                  guard
-                      let name  = d["name"]        as? String,
-                      let geo   = d["coordinates"] as? GeoPoint,
-                      let idx   = d["orderIndex"]  as? Int,
-                      let time  = d["timeSpent"]   as? Int
-                  else { return nil }
-
-                  let url = (d["photoURL"] as? String).flatMap(URL.init)
-                  let notes = d["notes"] as? String
-                  
-                  return Stop(id: doc.documentID,
-                              name: name,
-                              coordinates: geo,
-                              orderIndex: idx,
-                              timeSpent: time,
-                              photoURL: url,
-                              notes: notes)
-              } ?? []
-              completion(.success(stops))
-          }
-    }
-
+    // 1. Список маршрутов
+    func fetchRoutes() async throws -> [TourRoute] {
+        // Теперь можно раскомментировать, если у всех доков есть дата!
+        let snapshot = try await db.collection("routes")
+            .order(by: "createdAt", descending: true)
+            .limit(to: 50)
+            .getDocuments()
+            
+            return snapshot.documents.compactMap { doc in
+                if let route = TourRoute(from: doc) {
+                    return route
+                } else {
+                    print("❌ Не удалось преобразовать документ: \(doc.documentID)")
+                    print("   Данные: \(doc.data())")
+                    return nil
+                }
+            }
+        }
     
+    // 2. Остановки (Метод async, без completion handler!)
+    func fetchStops(for routeID: String) async throws -> [Stop] {
+        let snapshot = try await db.collection("routes")
+            .document(routeID)
+            .collection("stops")
+            .order(by: "orderIndex")
+            .getDocuments()
+        
+        return snapshot.documents.compactMap { doc -> Stop? in
+            let d = doc.data()
+            
+            guard
+                let name = d["name"] as? String,
+                let geo = d["coordinates"] as? GeoPoint,
+                let idx = d["orderIndex"] as? Int
+            else { return nil }
+            
+            let time = d["timeSpent"] as? Int ?? 0
+            let url = (d["photoURL"] as? String).flatMap(URL.init)
+            let notes = d["notes"] as? String
+            
+            return Stop(
+                id: doc.documentID,
+                name: name,
+                coordinates: geo,
+                orderIndex: idx,
+                timeSpent: time,
+                photoURL: url,
+                notes: notes
+            )
+        }
+    }
 }
+
+// Расширение для TourRoute
 extension TourRoute {
     init?(from doc: QueryDocumentSnapshot) {
         let d = doc.data()
+        
+        // Проверяем только title, остальное пытаемся спасти
+        guard let title = d["title"] as? String else {
+            print("⚠️ В документе \(doc.documentID) нет title")
+            return nil
+        }
 
-        guard let title  = d["title"]      as? String,
-              let author = d["authorUID"]  as? String else { return nil }
+        // Если автора нет, подставляем заглушку, чтобы маршрут не исчез
+        let author = d["authorUID"] as? String ?? "Unknown Author"
 
         self.init(
-            id:           doc.documentID,
-            title:        title,
-            authorUID:    author,
-            rating:       d["rating"]       as? Double ?? 0,
-            reviewCount:  d["reviewCount"]  as? Int    ?? 0,
-            duration:     d["duration"]     as? Double ?? 0,
-            tags:         d["tags"]         as? [String] ?? [],
-            price:        d["price"]        as? Double,          // nil → free
+            id: doc.documentID,
+            title: title,
+            authorUID: author,
+            rating: d["rating"] as? Double ?? 0,
+            reviewCount: d["reviewCount"] as? Int ?? 0,
+            duration: d["duration"] as? Double ?? 0,
+            tags: d["tags"] as? [String] ?? [],
+            price: d["price"] as? Double, // Если в модели price опциональный (Double?)
             thumbnailURL: (d["thumbnailURL"] as? String).flatMap(URL.init),
-            stopsCount:   d["stopsCount"]   as? Int ?? 0
+            stopsCount: d["stopsCount"] as? Int ?? 0
         )
     }
 }
-

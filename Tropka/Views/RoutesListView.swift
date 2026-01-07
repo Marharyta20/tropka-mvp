@@ -1,11 +1,11 @@
 import SwiftUI
 
 struct RoutesListView: View {
-    @StateObject private var vm = RoutesViewModel()   // теперь тип найден
+    @StateObject private var vm = RoutesViewModel()
 
     var body: some View {
         NavigationView {
-            List(vm.routes) { route in               // Route : Identifiable
+            List(vm.routes) { route in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(route.title)
                         .font(.headline)
@@ -14,10 +14,10 @@ struct RoutesListView: View {
             .navigationTitle("Routes")
             .toolbar {
                 Button("Sign Out") {
-                    try? AuthService.shared.signOut()
+                    AuthService.shared.signOut()
                 }
             }
-            .overlay {                                // простая индикация загрузки
+            .overlay {
                 if vm.isLoading { ProgressView() }
             }
             .alert("Error", isPresented: .constant(vm.errorMsg != nil)) {

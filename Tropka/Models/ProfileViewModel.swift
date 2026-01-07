@@ -79,6 +79,7 @@ class ProfileViewModel: ObservableObject {
     /// Reads `users/{uid}/savedRoutes` (doc IDs = route IDs) and loads corresponding docs from `routes` collection
     private func fetchSavedRoutes() {
         guard let uid = auth.currentUser?.uid else { return }
+        nonisolated(unsafe) let db = self.db
         
         db.collection("users")
             .document(uid)
@@ -114,7 +115,7 @@ class ProfileViewModel: ObservableObject {
                 
                 for chunk in chunks {
                     group.enter()
-                    self?.db.collection("routes")
+                    db.collection("routes")
                         .whereField(FieldPath.documentID(), in: chunk)
                         .getDocuments { qs, _ in
                             qs?.documents.forEach { doc in
@@ -145,9 +146,11 @@ class ProfileViewModel: ObservableObject {
                         }
                 }
                 
-                group.notify(queue: .main) {
-                    self?.routes = collected.sorted {
-                        ($0.savedAt ?? .distantPast) > ($1.savedAt ?? .distantPast)
+                group.notify(queue: .main) { [weak self] in
+                    Task { @MainActor in
+                        self?.routes = collected.sorted {
+                            ($0.savedAt ?? .distantPast) > ($1.savedAt ?? .distantPast)
+                        }
                     }
                 }
             }

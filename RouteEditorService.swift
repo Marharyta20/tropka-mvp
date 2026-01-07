@@ -34,7 +34,7 @@ struct RouteEditorService {
         if let price = price { routeData["price"] = price }
         if let thumb = thumbnailURL?.absoluteString { routeData["thumbnailURL"] = thumb }
 
-        try await db.runTransaction { txn, _ in
+        let _ = try await db.runTransaction { txn, _ in
             txn.setData(routeData, forDocument: routeRef)
             return ()
         }

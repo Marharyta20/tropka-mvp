@@ -19,7 +19,7 @@ struct TourDetailsView: View {
                 if route.isActuallyFree {
                     Button {
                         Task {
-                            await vm.saveRoute()
+                            await vm.saveRoute(routeID: route.id)
                         }
                     } label: {
                         Text(vm.isSaved ? "Saved" : "Get for free")

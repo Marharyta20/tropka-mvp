@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 
+@MainActor
 final class RoutesViewModel: ObservableObject {
     @Published var routes: [TourRoute] = []
     @Published var isLoading = false
@@ -8,14 +9,17 @@ final class RoutesViewModel: ObservableObject {
 
     func loadRoutes() {
         isLoading = true
-        FirestoreService.shared.fetchExploreRoutes { [weak self] result in
-            DispatchQueue.main.async {
-                self?.isLoading = false
-                switch result {
-                case .success(let r): self?.routes = r
-                case .failure(let e):  self?.errorMsg = e.localizedDescription
-                }
+        errorMsg = nil
+        
+        Task{
+            do {
+                let fetchedRoutes = try await FirestoreService.shared.fetchRoutes()
+                self.routes = fetchedRoutes
+            } catch {
+                self.errorMsg = error.localizedDescription
             }
+            
+            self.isLoading = false
         }
     }
 }

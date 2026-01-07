@@ -1,66 +1,52 @@
-import Foundation
-import FirebaseFirestore
+import SwiftUI
+import Combine
 
-/// View-model that loads the public “Explore” list of routes
-/// and exposes them to SwiftUI.
-final class ExploreViewModel: ObservableObject {
+@MainActor // Весь код выполняется в главном потоке (для UI)
+class ExploreViewModel: ObservableObject {
     
-    // MARK: - Published state
+    @Published var routes: [TourRoute] = []
+    @Published var isLoading = false
+    @Published var errorMessage: String?
     
-    @Published var routes:    [TourRoute] = []
-    @Published var isLoading: Bool    = false
-    @Published var errorMsg:  String?
+    // Поисковой запрос
+    @Published var searchText = ""
     
-    // MARK: - Private
+    private var allRoutes: [TourRoute] = [] // Храним копию для фильтрации
     
-    private let db = Firestore.firestore()
+    init() {
+        // Загружаем данные сразу при создании
+        loadRoutes()
+    }
     
-    // MARK: - Public API
-    
-    /// Call from `.onAppear {}` in the view.
     func loadRoutes() {
         isLoading = true
-        errorMsg  = nil
+        errorMessage = nil
         
-        db.collection("routes")
-            .order(by: "rating", descending: true)          // ← any sort you like
-            .getDocuments { [weak self] snap, err in
-                guard let self = self else { return }
+        Task {
+            do {
+                // 1. Одна строчка вместо огромного блока кода!
+                let fetchedRoutes = try await FirestoreService.shared.fetchRoutes()
                 
-                DispatchQueue.main.async {
-                    self.isLoading = false
-                    
-                    if let err = err {
-                        self.errorMsg = err.localizedDescription
-                        return
-                    }
-                    
-                    self.routes = snap?.documents.compactMap { doc -> TourRoute? in
-                        let d = doc.data()
-                        
-                        // — required ﬁelds
-                        guard
-                            let title  = d["title"]      as? String,
-                            let author = d["authorUID"]  as? String
-                        else { return nil }
-                        
-                        // — optional convert
-                        let thumbURL = (d["thumbnailURL"] as? String).flatMap(URL.init)
-                        
-                        return TourRoute(
-                            id:           doc.documentID,
-                            title:        title,
-                            authorUID:    author,
-                            rating:       d["rating"]       as? Double ?? 0,
-                            reviewCount:  d["reviewCount"] as? Int    ?? 0,
-                            duration:     d["duration"]     as? Double ?? 0,
-                            tags:         d["tags"]         as? [String] ?? [],
-                            price:        d["price"]        as? Double,     // nil → free
-                            thumbnailURL: thumbURL,
-                            stopsCount: d["stopsCount"] as? Int    ?? 0
-                        )
-                    } ?? []
-                }
+                self.allRoutes = fetchedRoutes
+                self.routes = fetchedRoutes
+                
+            } catch {
+                self.errorMessage = error.localizedDescription
             }
+            
+            self.isLoading = false
+        }
+    }
+    
+    // Простая фильтрация (Smart Search)
+    func filterRoutes() {
+        if searchText.isEmpty {
+            routes = allRoutes
+        } else {
+            routes = allRoutes.filter { route in
+                route.title.localizedCaseInsensitiveContains(searchText) ||
+                route.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
+            }
+        }
     }
 }

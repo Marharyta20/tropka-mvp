@@ -1,14 +1,17 @@
 import Foundation
 import FirebaseFirestore
-
-// MARK: - Stop model (document in /routes/{routeId}/stops)
+import CoreLocation
 
 struct Stop: Identifiable, Equatable {
     let id: String
     let name: String
-    let coordinates: GeoPoint
+    let coordinates: GeoPoint 
     let orderIndex: Int
-    let timeSpent: Int      // minutes
+    let timeSpent: Int
     let photoURL: URL?
     let notes: String?
+    
+    var location: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: coordinates.latitude, longitude: coordinates.longitude)
+    }
 }

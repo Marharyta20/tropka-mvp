@@ -77,7 +77,7 @@
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
-      shouldUseLaunchSchemeArgsEnv = "YES"
+      shouldUseLaunchSchemeArgsEnv = "NO"
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
@@ -91,6 +91,13 @@
             ReferencedContainer = "container:Tropka.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "MAPBOX_DOWNLOADS_TOKEN"
+            value = "sk.eyJ1IjoidHJhdmVsYXBwLWNvbSIsImEiOiJjbWs0YnA5NHYwMDVkM2VzOHF5Nmw0MjhxIn0.Vp77aTU2kcMtWXkddkhdiQ"
+            isEnabled = "YES">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
    </ProfileAction>
    <AnalyzeAction
       buildConfiguration = "Debug">

@@ -1,6 +1,6 @@
 import SwiftUI
 import CoreLocation
-import MapboxMaps
+import MapboxMaps // Вы импортировали Mapbox, но этот экран использует Apple Maps (MapKit)
 import FirebaseFirestore
 import UIKit
 import MapKit
@@ -12,22 +12,26 @@ enum RouteEditorMode {
 
 struct MapView: View {
     var mode: RouteEditorMode = .create
+    
     @State private var title: String = ""
     @State private var tags: [String] = []
     @State private var newTagText: String = ""
     @State private var priceText: String = "" // localized decimal
     @State private var thumbnailImage: UIImage?
     @State private var thumbnailURL: URL?
-
     @State private var stops: [Stop] = []
     @State private var showSearch = false
     @State private var isSaving = false
     @State private var isUploading = false
     @State private var errorMessage: String?
+    @State private var imagePickerDelegate: ImagePickerDelegateWrapper?  // Added strong delegate reference
 
-    @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
-        span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+    // ИСПРАВЛЕНИЕ: Используем MapCameraPosition вместо MKCoordinateRegion для iOS 17+
+    @State private var position: MapCameraPosition = .region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+        )
     )
 
     var body: some View {
@@ -110,8 +114,38 @@ struct MapView: View {
             }
             .padding(.horizontal)
 
-            Map(coordinateRegion: $region)
+            // ИСПРАВЛЕНИЕ: Map iOS 17
+            Map(position: $position) {
+                // Сюда можно добавлять маркеры (Annotation)
+            }
+            .mapControls {
+                MapUserLocationButton()
+                MapCompass()
+                MapScaleView()
+            }
+            .safeAreaInset(edge: .bottom) {
+                // Кнопка сохранения поверх карты (опционально)
+                Button {
+                    Task { await saveRoute() }
+                } label: {
+                    if isSaving {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Save Route")
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+                .padding()
+                .disabled(isSaving || title.isEmpty)
+            }
         }
+        .alert(item: Binding(get: { errorMessage.map { ErrorWrapper(error: $0) } }, set: { _ in errorMessage = nil })) { wrapper in
+             Alert(title: Text("Error"), message: Text(wrapper.error), dismissButton: .default(Text("OK")))
+         }
     }
 
     private func presentImagePicker() {
@@ -119,12 +153,14 @@ struct MapView: View {
         let picker = UIImagePickerController()
         picker.sourceType = .photoLibrary
         picker.allowsEditing = true
-        picker.delegate = ImagePickerDelegateWrapper { image in
+        let delegate = ImagePickerDelegateWrapper { image in
             if let image = image, let data = image.jpegData(compressionQuality: 0.85) {
                 self.thumbnailImage = image
                 Task { await uploadThumbnail(data: data) }
             }
         }
+        self.imagePickerDelegate = delegate
+        picker.delegate = delegate
         UIApplication.shared.topMostViewController()?.present(picker, animated: true)
     }
 
@@ -185,6 +221,14 @@ struct MapView: View {
         }
     }
 }
+
+// Вспомогательная структура для Alert
+struct ErrorWrapper: Identifiable {
+    let id = UUID()
+    let error: String
+}
+
+// MARK: - Helpers
 
 private final class ImagePickerDelegateWrapper: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     private let onImage: (UIImage?) -> Void

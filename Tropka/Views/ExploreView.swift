@@ -24,7 +24,8 @@ struct ExploreView: View {
         }
         // Фильтр: бесплатные
         if showOnlyFree {
-            result = result.filter { $0.isActuallyFree }
+            // ИСПРАВЛЕНИЕ: Проверяем цену напрямую, если свойства isActuallyFree нет
+            result = result.filter { ($0.price ?? 0) < 0.01 }
         }
         // Фильтр: по тегу
         if let tag = selectedTag {
@@ -46,7 +47,8 @@ struct ExploreView: View {
     }
     
     var body: some View {
-        NavigationView {
+        // ИСПРАВЛЕНИЕ: NavigationStack вместо NavigationView
+        NavigationStack {
             VStack(spacing: 10) {
                 // ——— Search bar
                 TextField("Search by route name", text: $searchText)
@@ -104,19 +106,21 @@ struct ExploreView: View {
                     if vm.isLoading {
                         ProgressView("Loading…")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if let msg = vm.errorMsg {
+                    }
+                    // ИСПРАВЛЕНИЕ: vm.errorMessage вместо vm.errorMsg
+                    else if let msg = vm.errorMessage {
                         ErrorBlock(message: msg) { vm.loadRoutes() }
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 24) {
                                 ForEach(filteredRoutes) { r in
-                                    NavigationLink {
-                                        TourDetailsView(route: r)
-                                    } label: {
+                                    // NavigationLink для NavigationStack
+                                    NavigationLink(destination: TourDetailsView(route: r)) {
                                         ExploreCard(route: r)
                                     }
                                     .buttonStyle(.plain)
                                 }
+                                
                                 if filteredRoutes.isEmpty {
                                     Text("No routes found.")
                                         .foregroundColor(.secondary)
@@ -134,7 +138,9 @@ struct ExploreView: View {
             }
             .navigationTitle("Explore")
         }
-        .onAppear { if vm.routes.isEmpty { vm.loadRoutes() } }
+        .onAppear {
+            if vm.routes.isEmpty { vm.loadRoutes() }
+        }
     }
 }
 
