@@ -2,38 +2,49 @@ import SwiftUI
 import MapboxMaps
 
 struct RouteMapView: View {
-
-    // ViewModel приходит извне (TourDetailsView его создаёт)
+    
+    // ViewModel приходит извне
     @ObservedObject var vm: TourDetailsViewModel
-
-    // ― Mapbox managers, нужны как @State - обёртки для UIViewRepresentable
-    @State private var mapView:    MapboxMaps.MapView?
-    @State private var pinManager: MapboxMaps.PointAnnotationManager?
-    @State private var lineManager: MapboxMaps.PolylineAnnotationManager?
+    
+    // ❌ УДАЛЕНО: Больше не нужны @State для mapView и менеджеров,
+    // так как MapRepresentable теперь справляется сам.
 
     var body: some View {
         ZStack(alignment: .bottom) {
-
+            
             // ❶ Карта + аннотации
+            // ✅ ИСПРАВЛЕНО: Передаем только данные
             MapRepresentable(
-                mapView:     $mapView,
-                pinManager:  $pinManager,
-                lineManager: $lineManager,
-                stops:       vm.stops,
-                routeCoords: vm.routeCoords        // ← линия «по дорогам»
+                stops: vm.stops,
+                routeCoords: vm.routeCoords
             )
             .edgesIgnoringSafeArea(.all)
+            
+            // ❷ Мини-лист остановок (оставляем как было)
 
-            // ❷ Мини-лист остановок
-            StopsBottomSheet(stops: vm.stops)         // тот, что уже был
+            StopsBottomSheet(stops: vm.stops)
+            
+            // Если компонента нет, можно временно показать кнопку для теста:
+            /*
+            VStack {
+                Spacer()
+                Text("Stops: \(vm.stops.count)")
+                    .padding()
+                    .background(.thinMaterial)
+                    .cornerRadius(10)
+                    .padding()
+            }
+            */
         }
         .onAppear {
-            // Если stops уже загружены – строим линию
+            // Если stops есть, а линии еще нет – пробуем построить
             if !vm.stops.isEmpty && vm.routeCoords.isEmpty {
                 vm.buildWalkingRoute()
             }
         }
-        // Перестраиваем линию, когда stops обновились
-        .onChange(of: vm.stops) { vm.buildWalkingRoute() }
+        // ✅ ИСПРАВЛЕНО: Синтаксис onChange для iOS 17+
+        .onChange(of: vm.stops) { _, _ in
+            vm.buildWalkingRoute()
+        }
     }
 }

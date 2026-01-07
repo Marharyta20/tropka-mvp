@@ -77,7 +77,7 @@
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
-      shouldUseLaunchSchemeArgsEnv = "NO"
+      shouldUseLaunchSchemeArgsEnv = "YES"
       savedToolIdentifier = ""
       useCustomWorkingDirectory = "NO"
       debugDocumentVersioning = "YES">
@@ -95,7 +95,7 @@
          <EnvironmentVariable
             key = "MAPBOX_DOWNLOADS_TOKEN"
             value = "sk.eyJ1IjoidHJhdmVsYXBwLWNvbSIsImEiOiJjbWs0YnA5NHYwMDVkM2VzOHF5Nmw0MjhxIn0.Vp77aTU2kcMtWXkddkhdiQ"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
       </EnvironmentVariables>
    </ProfileAction>

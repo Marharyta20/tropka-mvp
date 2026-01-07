@@ -14,10 +14,7 @@ struct CreateEditRouteView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
-    // Map bindings for MapRepresentable
-    @State private var mapView: MapboxMaps.MapView?
-    @State private var pinManager: PointAnnotationManager?
-    @State private var lineManager: PolylineAnnotationManager?
+    // ❌ УДАЛЕНО: map bindings больше не нужны, MapRepresentable работает сам
 
     var body: some View {
         NavigationStack {
@@ -31,12 +28,10 @@ struct CreateEditRouteView: View {
 
                 // Map preview of current stops
                 ZStack {
+                    // ✅ ИСПРАВЛЕНО: Простая передача данных
                     MapRepresentable(
-                        mapView: $mapView,
-                        pinManager: $pinManager,
-                        lineManager: $lineManager,
                         stops: stops,
-                        routeCoords: []
+                        routeCoords: [] // В редакторе пока не строим линию маршрута, только точки
                     )
                     .frame(height: 240)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -45,6 +40,9 @@ struct CreateEditRouteView: View {
                     if stops.isEmpty {
                         Text("No stops yet. Add some via Search.")
                             .foregroundColor(.secondary)
+                            .padding()
+                            .background(.thinMaterial)
+                            .cornerRadius(8)
                     }
                 }
 
@@ -94,7 +92,11 @@ struct CreateEditRouteView: View {
                     addStop(from: result)
                 })
             }
-            .onAppear { if case let .edit(id) = mode { Task { await loadRoute(id) } } }
+            .onAppear {
+                if case let .edit(id) = mode {
+                    Task { await loadRoute(id) }
+                }
+            }
         }
     }
 
@@ -115,7 +117,6 @@ struct CreateEditRouteView: View {
     }
 
     private func addStop(from result: MapboxSearchResult) {
-        // Minimal Stop construction; assumes Stop has this initializer in your project.
         let geo = GeoPoint(latitude: result.coordinate.latitude, longitude: result.coordinate.longitude)
         let new = Stop(
             id: UUID().uuidString,
@@ -131,20 +132,22 @@ struct CreateEditRouteView: View {
 
     private func saveRoute() {
         // Placeholder: integrate with your Firestore create/update logic.
-        // For now, just fake a save and clear error.
         isSaving = true
         errorMessage = nil
+        
+        // Тут вызовите свой сервис сохранения, например:
+        // try await RouteEditorService().createRoute(...)
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             isSaving = false
         }
     }
 
     private func loadRoute(_ id: String) async {
-        // Placeholder for loading existing route into editor; integrate with Firestore.
+        // Placeholder for loading existing route into editor
     }
 }
 
 #Preview {
     CreateEditRouteView(mode: .create)
 }
-
