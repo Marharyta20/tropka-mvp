@@ -1,10 +1,12 @@
 import SwiftUI
 import SDWebImageSwiftUI
 import MapboxMaps
+import CoreLocation
 
 // MARK: – Route details ▸ экран одного маршрута
 struct TourDetailsView: View {
     let route: TourRoute
+    let locationManager = CLLocationManager()
     @StateObject private var vm = TourDetailsViewModel()
 
     @State private var showMap         = false
@@ -112,10 +114,14 @@ struct TourDetailsView: View {
             .padding(20)
         }
         .onAppear {
-            Task {
-                await vm.load(routeID: route.id)
-            }
-        }
+                    // 1. Запрос геолокации (Новое)
+                    locationManager.requestWhenInUseAuthorization()
+                    
+                    // 2. Загрузка данных (Старое - ВЕРНУЛИ НА МЕСТО)
+                    Task {
+                        await vm.load(routeID: route.id)
+                    }
+                }
         // –– Лист для Review
         .sheet(isPresented: $showReviewSheet) {
             ReviewFormSheet(

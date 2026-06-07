@@ -1,52 +1,53 @@
 import Foundation
 import FirebaseFirestore
 import Combine
-import MapboxDirections
 import CoreLocation
+import MapboxDirections
+import MapboxNavigationCore
 
 @MainActor
 final class TourDetailsViewModel: ObservableObject {
     @Published var stops: [Stop] = []
     @Published var isLoading = false
     @Published var errorMsg: String? = nil
-    
+
     @Published var routeCoords: [CLLocationCoordinate2D] = []
     @Published var isSaved = false
     @Published var myReview: UserReview? = nil
-    
+
+    // ✅ ВАЖНО для Navigation v3: храним NavigationRoutes, а не Route/RouteResponse
+    @Published var navigationRoutes: NavigationRoutes?
+
     private let saveSvc = SavedRoutesService()
     private let reviewSvc = ReviewService()
-    
-    // Прямой вызов сервиса
+
+    private let navigationProvider = NavigationContainer.shared.provider
+
     func load(routeID: String) async {
         isLoading = true
         errorMsg = nil
-        
-        // Загружаем всё параллельно
+
         async let savedTask = saveSvc.isSaved(routeID: routeID)
         async let reviewTask = fetchMyReview(routeID: routeID)
         async let stopsTask = fetchStops(routeID: routeID)
-        
+
         do {
             let (isSaved, review, stops) = try await (savedTask, reviewTask, stopsTask)
-            
+
             self.isSaved = isSaved
             self.myReview = review
             self.stops = stops
-            
-            // Если есть остановки, строим линию маршрута
+
             if !stops.isEmpty {
-                buildWalkingRoute()
+                await buildWalkingRoute()
             }
-            
         } catch {
             self.errorMsg = error.localizedDescription
         }
-        self.isLoading = false
+
+        isLoading = false
     }
-    
-    // MARK: - Actions
-    
+
     func saveRoute(routeID: String) async {
         guard !isSaved else { return }
         do {
@@ -56,7 +57,7 @@ final class TourDetailsViewModel: ObservableObject {
             self.errorMsg = error.localizedDescription
         }
     }
-    
+
     func saveReview(_ review: UserReview) async {
         do {
             self.myReview = try await reviewSvc.upsert(review: review)
@@ -64,43 +65,37 @@ final class TourDetailsViewModel: ObservableObject {
             print("Error saving review: \(error)")
         }
     }
-    
-    // MARK: - Helpers
-    
+
     private func fetchMyReview(routeID: String) async throws -> UserReview? {
         try await reviewSvc.fetchMyReview(routeID: routeID)
     }
-    
+
     private func fetchStops(routeID: String) async throws -> [Stop] {
-        return try await FirestoreService.shared.fetchStops(for: routeID)
+        try await FirestoreService.shared.fetchStops(for: routeID)
     }
-    
-        func buildWalkingRoute() {
-            // Убедитесь, что Stop.swift имеет var location: CLLocationCoordinate2D
-            let wps = stops.map { Waypoint(coordinate: $0.location) }
-            
-            guard !wps.isEmpty else { return }
-            
-            let opts = RouteOptions(waypoints: wps, profileIdentifier: .walking)
-            opts.includesSteps = false
-            opts.routeShapeResolution = .full // Это важно, чтобы сервер вернул геометрию
-            
-            Directions.shared.calculate(opts) { [weak self] result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let response):
-                        // ИСПРАВЛЕНИЕ ЗДЕСЬ:
-                        // Берем .shape?.coordinates вместо просто .coordinates
-                        if let route = response.routes?.first,
-                           let coords = route.shape?.coordinates {
-                            
-                            self?.routeCoords = coords
-                        }
-                        
-                    case .failure(let error):
-                        print("Mapbox Error: \(error.localizedDescription)")
-                    }
-                }
+
+    // ✅ Генерируем маршруты так, как ожидает Navigation SDK v3 (через routingProvider)
+    func buildWalkingRoute() async {
+        let waypoints = stops.map { Waypoint(coordinate: $0.location) }
+        guard waypoints.count >= 2 else { return }
+
+        let options = NavigationRouteOptions(waypoints: waypoints, profileIdentifier: .walking)
+        options.includesSteps = true
+        options.routeShapeResolution = .full
+
+        do {
+            let routingProvider = navigationProvider.mapboxNavigation.routingProvider()
+            let result = try await routingProvider.calculateRoutes(options: options).value
+
+            self.navigationRoutes = result
+
+            // для отрисовки линии на карте (оставляем как у тебя)
+            if let coords = result.mainRoute.route.shape?.coordinates {
+                self.routeCoords = coords
             }
+        } catch {
+            self.errorMsg = error.localizedDescription
+            print("RoutingProvider error:", error)
         }
+    }
 }

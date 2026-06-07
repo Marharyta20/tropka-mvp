@@ -94,29 +94,32 @@ struct MapRepresentable: UIViewRepresentable {
     }
     
     // MARK: - Make UIView
-    func makeUIView(context: Context) -> MapboxMaps.MapView {
-        let myMapInitOptions = MapInitOptions(styleURI: .outdoors)
-        let mapView = MapboxMaps.MapView(frame: .zero, mapInitOptions: myMapInitOptions)
-        
-        mapView.ornaments.scaleBarView.isHidden = true
-        mapView.ornaments.compassView.isHidden = false
-        
-        // Подписываемся на событие "Стиль загружен"
-        if let image = UIImage(systemName: "mappin.circle.fill")?.withRenderingMode(.alwaysTemplate) {
-            mapView.mapboxMap.onStyleLoaded.observeNext { [weak coordinator = context.coordinator] _ in
-                guard let coordinator = coordinator else { return }
-                
-                // 1. Добавляем картинку
-                try? mapView.mapboxMap.addImage(image, id: "default-pin")
-                
-                // 2. ВАЖНО: Вызываем перерисовку, так как теперь стиль точно готов
-                coordinator.drawAnnotations(on: mapView)
-                
-            }.store(in: &context.coordinator.cancelables)
+        func makeUIView(context: Context) -> MapboxMaps.MapView {
+            let myMapInitOptions = MapInitOptions(styleURI: .outdoors)
+            let mapView = MapboxMaps.MapView(frame: .zero, mapInitOptions: myMapInitOptions)
+            
+            mapView.ornaments.scaleBarView.isHidden = true
+            mapView.ornaments.compassView.isHidden = false
+            
+            // 👇 НОВОЕ: Включаем "шайбу" (синюю точку) пользователя
+            mapView.location.options.puckType = .puck2D()
+            mapView.location.options.puckBearing = .heading // Чтобы шайба крутилась, куда смотрит телефон
+            
+            // Подписываемся на стиль
+            if let image = UIImage(systemName: "mappin.circle.fill")?.withRenderingMode(.alwaysTemplate) {
+                mapView.mapboxMap.onStyleLoaded.observeNext { [weak mapView] _ in
+                    guard let mapView = mapView else { return }
+                    
+                    try? mapView.mapboxMap.addImage(image, id: "default-pin")
+                    
+                    // Рисуем маршрут
+                    context.coordinator.drawAnnotations(on: mapView)
+                    
+                }.store(in: &context.coordinator.cancelables)
+            }
+            
+            return mapView
         }
-        
-        return mapView
-    }
 
     // MARK: - Update UIView
     func updateUIView(_ mapView: MapboxMaps.MapView, context: Context) {
@@ -129,3 +132,4 @@ struct MapRepresentable: UIViewRepresentable {
         context.coordinator.drawAnnotations(on: mapView)
     }
 }
+

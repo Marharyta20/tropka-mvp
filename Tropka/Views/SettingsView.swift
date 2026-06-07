@@ -3,25 +3,25 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var profileVM: ProfileViewModel
-    @StateObject private var vm = SettingsViewModel()
+    @StateObject private var vm: SettingsViewModel = .init()
 
     @State private var showSaved = false
 
     var body: some View {
-        ScrollView {
+        ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: 28) {
 
                 //–– Full name
                 editableField(title: "FULL NAME", text: $vm.displayName,
-                              keyboard: .default)
+                              keyboard: UIKeyboardType.default)
 
                 //–– City
                 editableField(title: "CITY", text: $vm.city,
-                              keyboard: .default)
+                              keyboard: UIKeyboardType.default)
 
                 //–– Username
                 editableField(title: "USERNAME", text: $vm.username,
-                              keyboard: .asciiCapable)
+                              keyboard: UIKeyboardType.asciiCapable)
 
                 //–– Save
                 Button("Save") {
@@ -56,7 +56,12 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .overlay { if vm.isBusy { ProgressView().scaleEffect(1.3) } }
+        .overlay {
+            if vm.isBusy {
+                ProgressView()
+                    .controlSize(.large)
+            }
+        }
         .alert("Changes saved", isPresented: $showSaved) {
             Button("OK", role: .cancel) { }
         }
@@ -85,7 +90,7 @@ struct SettingsView: View {
                 if let prefix { Text(prefix).foregroundColor(.secondary) }
                 TextField("", text: text)
                     .keyboardType(keyboard)
-                    .autocapitalization(.none)
+                    .textInputAutocapitalization(.never)
                     .disableAutocorrection(true)
             }
             .padding(12)
@@ -96,3 +101,4 @@ struct SettingsView: View {
         }
     }
 }
+

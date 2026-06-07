@@ -48,7 +48,7 @@ final class MapboxSearchService {
         }
         components.queryItems = items
 
-        let (data, response) = try await session.data(from: components.url!)
+        let (data, response) = try await session.data(for: URLRequest(url: components.url!), delegate: nil)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw NSError(domain: "MapboxSearchService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Mapbox API error"])
         }
