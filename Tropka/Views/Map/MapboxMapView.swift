@@ -32,7 +32,6 @@ struct MapboxMapView: UIViewRepresentable {
         var onPinTapped: ((Place) -> Void)?
 
         private let locationManager = CLLocationManager()
-        private var hasCenteredOnUser = false
 
         override init() {
             super.init()
@@ -54,9 +53,16 @@ struct MapboxMapView: UIViewRepresentable {
             locationManager.requestWhenInUseAuthorization()
             locationManager.startUpdatingLocation()
 
-            if let loc = locationManager.location {
-                centerOnUser(loc)
-            }
+            // Follow the user puck continuously (like Mapbox tracking mode example)
+            let followState = mapView.viewport.makeFollowPuckViewportState(
+                options: FollowPuckViewportStateOptions(
+                    padding: UIEdgeInsets(top: 200, left: 0, bottom: 0, right: 0),
+                    zoom: 15,
+                    bearing: .constant(0),
+                    pitch: 0
+                )
+            )
+            mapView.viewport.transition(to: followState)
         }
 
         func updateAnnotations(with places: [Place]) {
@@ -119,14 +125,7 @@ struct MapboxMapView: UIViewRepresentable {
         }
 
         func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-            guard !hasCenteredOnUser, let location = locations.last else { return }
-            centerOnUser(location)
-            hasCenteredOnUser = true
-        }
-
-        private func centerOnUser(_ location: CLLocation) {
-            let options = CameraOptions(center: location.coordinate, zoom: 14)
-            mapView?.mapboxMap.setCamera(to: options)
+            // Camera tracking is handled by viewport — nothing to do here
         }
     }
 }
