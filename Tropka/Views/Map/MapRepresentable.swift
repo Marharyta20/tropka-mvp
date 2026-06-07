@@ -2,15 +2,7 @@ import SwiftUI
 import UIKit
 import MapboxMaps
 import CoreLocation
-import FirebaseFirestore
 import Turf
-
-// Расширение для GeoPoint
-extension GeoPoint {
-    var clCoord: CLLocationCoordinate2D {
-        .init(latitude: latitude, longitude: longitude)
-    }
-}
 
 struct MapRepresentable: UIViewRepresentable {
     
@@ -47,7 +39,7 @@ struct MapRepresentable: UIViewRepresentable {
             
             // --- РИСУЕМ ПИНЫ ---
             let points: [PointAnnotation] = parent.stops.enumerated().map { index, stop in
-                var annotation = PointAnnotation(coordinate: stop.coordinates.clCoord)
+                var annotation = PointAnnotation(coordinate: stop.location)
                 annotation.iconImage = "default-pin" // Ссылка на картинку
                 annotation.iconColor = StyleColor(.red)
                 annotation.textField = "\(index + 1)"
@@ -58,8 +50,7 @@ struct MapRepresentable: UIViewRepresentable {
             }
             pointManager.annotations = points
             
-            // --- РИСУЕМ ЛИНИЮ ---
-            let lineCoordinates = !parent.routeCoords.isEmpty ? parent.routeCoords : parent.stops.map { $0.coordinates.clCoord }
+            let lineCoordinates = !parent.routeCoords.isEmpty ? parent.routeCoords : parent.stops.map { $0.location }
             
             if lineCoordinates.count > 1 {
                 var polyline = PolylineAnnotation(lineCoordinates: lineCoordinates)

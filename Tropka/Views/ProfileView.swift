@@ -354,11 +354,11 @@ private struct ProfileRouteCell: View {
             
             
             if showStatus {
-                Text(item.isPurchased ? "Bought" : "Saved")
+                Text("Saved")
                     .font(.caption2).bold()
                     .foregroundColor(.white)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(item.isPurchased ? Color.green : Color.blue)
+                    .background(Color.blue)
                     .clipShape(Capsule())
             } else {
                 Button(action: { onHeartTap?() }) {

@@ -1,139 +1,133 @@
-import FirebaseAuth
-import FirebaseFirestore
+import Foundation
+
+// MARK: - ReviewService (table: public.reviews)
+// DB columns: id, route_id, user_id, rating, comment, created_at
+// Note: DB uses "comment"; app model uses "text" — mapped in this service.
 
 struct ReviewService {
-    // MARK: – private
-       private let db   = Firestore.firestore()
-       private let auth = Auth.auth()
 
-       /// Firestore data-payload (one place → one format)
-       private func payload(for r: UserReview) -> [String:Any] {
-           [
-               "authorUID" : auth.currentUser!.uid,
-               "rating"    : r.rating,
-               "text"      : r.text,
-               "createdAt" : Timestamp(date: r.createdAt)
-           ]
-       }
+    private func currentUID() throws -> String {
+        guard let uid = supabase.auth.currentUser?.id.uuidString else {
+            throw URLError(.userAuthenticationRequired)
+        }
+        return uid
+    }
 
-    // ──────────────────────────────────────────────
-    // MARK: Fetch
+    // MARK: - Internal row types
 
-    /// All reviews written by the current user (profile tab)
-    func fetchMyReviews() async throws -> [UserReview] {
-        guard let uid = auth.currentUser?.uid else { return [] }
+    private struct ReviewRow: Decodable {
+        let id: String
+        let routeId: String
+        let userId: String
+        let rating: Int
+        let comment: String?
+        let createdAt: Date
+        let routes: RouteTitle?
 
-        let qs = try await db.collection("users")
-                             .document(uid)
-                             .collection("reviews")
-                             .getDocuments()
+        struct RouteTitle: Decodable { let title: String }
 
-        var arr: [UserReview] = []
-        for doc in qs.documents {
-            let d = doc.data()
-            arr.append(
-                UserReview(
-                    id: doc.documentID,
-                    routeID: doc.documentID,
-                    routeTitle: d["routeTitle"] as? String ?? "Untitled",
-                    rating: d["rating"] as? Int ?? 0,
-                    text: d["text"] as? String ?? "",
-                    createdAt: (d["createdAt"] as? Timestamp)?.dateValue() ?? .now
-                )
+        enum CodingKeys: String, CodingKey {
+            case id
+            case routeId = "route_id"
+            case userId = "user_id"
+            case rating, comment
+            case createdAt = "created_at"
+            case routes
+        }
+
+        func toUserReview() -> UserReview {
+            UserReview(
+                id: id,
+                routeID: routeId,
+                userID: userId,
+                routeTitle: routes?.title ?? "Untitled",
+                rating: rating,
+                text: comment ?? "",
+                createdAt: createdAt
             )
         }
-        return arr.sorted { $0.createdAt > $1.createdAt }
     }
 
-    /// Single review by me for a particular route (details screen)
+    private struct ReviewUpsert: Encodable {
+        let id: String
+        let routeId: String
+        let userId: String
+        let rating: Int
+        let comment: String
+        enum CodingKeys: String, CodingKey {
+            case id
+            case routeId = "route_id"
+            case userId = "user_id"
+            case rating, comment
+        }
+    }
+
+    // MARK: - Fetch all my reviews
+
+    func fetchMyReviews() async throws -> [UserReview] {
+        let uid = try currentUID()
+        let rows: [ReviewRow] = try await supabase
+            .from("reviews")
+            .select("id, route_id, user_id, rating, comment, created_at, routes(title)")
+            .eq("user_id", value: uid)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+        return rows.map { $0.toUserReview() }
+    }
+
+    // MARK: - Fetch single review for a route
+
     func fetchMyReview(routeID: String) async throws -> UserReview? {
-        guard let uid = auth.currentUser?.uid else { return nil }
-
-        let snap = try await db.collection("users")
-                               .document(uid)
-                               .collection("reviews")
-                               .document(routeID)
-                               .getDocument()
-
-        guard let data = snap.data() else { return nil }
-
-        return UserReview(
-            id: routeID,                       // docID == routeID
-            routeID: routeID,
-            routeTitle: data["routeTitle"] as? String ?? "Untitled",
-            rating: data["rating"] as? Int ?? 0,
-            text: data["text"] as? String ?? "",
-            createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? .now
-        )
+        let uid = try currentUID()
+        let rows: [ReviewRow] = try await supabase
+            .from("reviews")
+            .select("id, route_id, user_id, rating, comment, created_at, routes(title)")
+            .eq("user_id", value: uid)
+            .eq("route_id", value: routeID)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first?.toUserReview()
     }
 
-    // ──────────────────────────────────────────────
-    // MARK: Create / Update / Delete
+    // MARK: - Upsert (create or update)
 
-    func create(review: UserReview) async throws {
-        let doc = db.collection("routes").document(review.routeID)
-            .collection("reviews").document(review.id)
-
-        try await doc.setData([
-            "authorUID" : auth.currentUser?.uid ?? "",
-            "rating"    : review.rating,
-            "text"      : review.text,
-            "createdAt" : Timestamp(date: review.createdAt)
-        ])
-    }
-
-    func update(review: UserReview) async throws {
-        try await db.collection("routes").document(review.routeID)
-            .collection("reviews").document(review.id)
-            .updateData([
-                "rating": review.rating,
-                "text"  : review.text
-            ])
-    }
-
-    // ──────────────────────────────────────────────
-    // MARK: Upsert 
-
-    /// Creates **or** updates the review and returns the stored copy
     @discardableResult
     func upsert(review: UserReview) async throws -> UserReview {
-        
-        guard let uid = auth.currentUser?.uid else { return review }
-        
-        let routeDoc = db.collection("routes")
-            .document(review.routeID)
-            .collection("reviews")
-            .document(uid)
-        
-        let userDoc = db.collection("users")
-            .document(uid)
-            .collection("reviews")
-            .document(review.routeID)
-        
-        let baseData = payload(for: review)
-        let data = baseData.merging(["routeTitle": review.routeTitle]) { _, new in new }
-        
-        try await routeDoc.setData(data, merge: true)
-        try await userDoc.setData(data, merge: true)
-        
-        return review
+        let uid = try currentUID()
+        let reviewID = review.id.isEmpty ? UUID().uuidString : review.id
+        let row = ReviewUpsert(
+            id: reviewID,
+            routeId: review.routeID,
+            userId: uid,
+            rating: review.rating,
+            comment: review.text
+        )
+        try await supabase.from("reviews").upsert(row).execute()
+        var saved = review
+        saved = UserReview(
+            id: reviewID,
+            routeID: review.routeID,
+            userID: uid,
+            routeTitle: review.routeTitle,
+            rating: review.rating,
+            text: review.text,
+            createdAt: review.createdAt
+        )
+        return saved
     }
-    
-    // MARK: Delete
+
+    func create(review: UserReview) async throws { try await upsert(review: review) }
+    func update(review: UserReview) async throws { try await upsert(review: review) }
+
+    // MARK: - Delete
+
     func delete(review: UserReview) async throws {
-        guard let uid = auth.currentUser?.uid else { return }
-
-        try await db.collection("routes")
-                    .document(review.routeID)
-                    .collection("reviews")
-                    .document(uid)
-                    .delete()
-
-        try await db.collection("users")
-                    .document(uid)
-                    .collection("reviews")
-                    .document(review.routeID)
-                    .delete()
+        try await supabase
+            .from("reviews")
+            .delete()
+            .eq("id", value: review.id)
+            .execute()
     }
-
 }

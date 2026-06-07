@@ -14,7 +14,7 @@ struct RoutesListView: View {
             .navigationTitle("Routes")
             .toolbar {
                 Button("Sign Out") {
-                    AuthService.shared.signOut()
+                    Task { try? await AuthService.shared.signOut() }
                 }
             }
             .overlay {

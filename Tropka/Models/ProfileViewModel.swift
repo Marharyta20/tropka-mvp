@@ -1,247 +1,155 @@
 import Foundation
 import Combine
-import FirebaseAuth
-import FirebaseFirestore
-import SwiftUI
 
-// MARK: – DTO
+// MARK: - SavedRoute (UI model)
+
 struct SavedRoute: Identifiable {
     let route: TourRoute
     let savedAt: Date?
-    let isPurchased: Bool
     var id: String { route.id }
 }
 
+// MARK: - ProfileViewModel
+
 @MainActor
 class ProfileViewModel: ObservableObject {
-    
-    // user
+
+    // User info
     @Published var displayName = "Loading..."
+    @Published var handle      = ""
     @Published var city        = ""
     @Published var registrationDate: Date?
-    @Published var handle      = ""           // unique @username / nick
-    
-    // saved / purchased routes
+
+    // Saved routes
     @Published var routes: [SavedRoute] = []
-    
-    // error banner
-    @Published var errorMessage: String?
-    
-    private let db   = Firestore.firestore()
-    private let auth = Auth.auth()
-    
-    //saved
-    private var cancellable: AnyCancellable?
-    
-    //wishlist
+
+    // Wishlist (mirrors routes — both backed by saved_routes table)
     @Published var wishlist: [SavedRoute] = []
-    private var wishCanc: AnyCancellable?
-    private let wishlistSvc = WishlistService()
-    
-    //reviews
+
+    // Reviews
     @Published var myReviews: [UserReview] = []
+
+    @Published var errorMessage: String?
+
     private let reviewSvc = ReviewService()
-    
+    private var cancellable: AnyCancellable?
+
     init() {
-        fetchUserProfile()
-        fetchSavedRoutes()
+        Task { await fetchAll() }
+
+        // Re-fetch saved routes whenever the store updates
         cancellable = SavedRoutesStore.shared.$savedIDs
-            .sink { [weak self] _ in self?.fetchSavedRoutes() }
-        wishCanc = WishlistStore.shared.$wishIDs
-            .sink { [weak self] ids in
-                Task { await self?.loadWishlist(ids: ids) }
+            .sink { [weak self] _ in
+                Task { await self?.fetchSavedRoutes() }
             }
+    }
+
+    // MARK: - Load all
+
+    func fetchAll() async {
+        await fetchUserProfile()
+        await fetchSavedRoutes()
         loadReviews()
     }
-    
-    // MARK: – Profile
-    private func fetchUserProfile() {
-        guard let uid = auth.currentUser?.uid else {
-            errorMessage = "Unable to get user UID"
-            return
-        }
-        db.collection("users").document(uid).getDocument { [weak self] snap, err in
-            DispatchQueue.main.async {
-                if let err = err { self?.errorMessage = err.localizedDescription; return }
-                guard let data = snap?.data() else { self?.errorMessage = "Profile not found"; return }
-                
-                self?.displayName = data["fullName"] as? String ?? "Unknown User"
-                self?.handle      = data["username"]  as? String ?? "user"
-                self?.city        = data["city"]     as? String ?? ""
-                if let ts = data["registrationDate"] as? Timestamp {
-                    self?.registrationDate = ts.dateValue()
-                }
+
+    // MARK: - Profile
+
+    private func fetchUserProfile() async {
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
+
+        struct UserRow: Decodable {
+            let fullName: String?
+            let username: String?
+            let registrationDate: Date?
+            let cities: CityRow?
+
+            struct CityRow: Decodable { let name: String }
+
+            enum CodingKeys: String, CodingKey {
+                case fullName = "full_name"
+                case username
+                case registrationDate = "registration_date"
+                case cities
             }
         }
-    }
-    
-    // MARK: – Saved / purchased routes
-    /// Reads `users/{uid}/savedRoutes` (doc IDs = route IDs) and loads corresponding docs from `routes` collection
-    private func fetchSavedRoutes() {
-        guard let uid = auth.currentUser?.uid else { return }
-        nonisolated(unsafe) let db = self.db
-        
-        db.collection("users")
-            .document(uid)
-            .collection("savedRoutes")
-            .getDocuments { [weak self] snap, err in
-                
-                if let err = err {
-                    DispatchQueue.main.async { self?.errorMessage = err.localizedDescription }
-                    return
-                }
-                
-                // routeId → (savedAt, isPurchased)
-                var meta: [String: (Date?, Bool)] = [:]
-                snap?.documents.forEach { doc in
-                    let data = doc.data()
-                    let date = (data["savedAt"] as? Timestamp)?.dateValue()
-                    let paid = data["isPurchased"] as? Bool ?? false
-                    meta[doc.documentID] = (date, paid)
-                }
-                
-                let ids = Array(meta.keys)
-                guard !ids.isEmpty else {
-                    DispatchQueue.main.async { self?.routes = [] }
-                    return
-                }
-                
-                // Firestore `in` accepts ≤10 IDs
-                let chunks = stride(from: 0, to: ids.count, by: 10)
-                    .map { Array(ids[$0..<min($0 + 10, ids.count)]) }
-                
-                var collected: [SavedRoute] = []
-                let group = DispatchGroup()
-                
-                for chunk in chunks {
-                    group.enter()
-                    db.collection("routes")
-                        .whereField(FieldPath.documentID(), in: chunk)
-                        .getDocuments { qs, _ in
-                            qs?.documents.forEach { doc in
-                                let d = doc.data()
-                                
-                                let route = TourRoute(
-                                    id:          doc.documentID,
-                                    title:       d["title"]        as? String ?? "Untitled",
-                                    authorUID:   d["authorUID"]    as? String ?? "",
-                                    rating:      d["rating"]       as? Double ?? 0,
-                                    reviewCount: d["reviewCount"]  as? Int ?? 0,
-                                    duration:    d["duration"]     as? Double ?? 0,
-                                    tags:        (d["tags"] as? [Any])?.compactMap { $0 as? String } ?? [],
-                                    price:       d["price"]        as? Double,
-                                    thumbnailURL:(d["thumbnailURL"] as? String).flatMap(URL.init),
-                                    stopsCount:  d["stopsCount"]   as? Int ?? 0
-                                )
-                                
-                                collected.append(
-                                    SavedRoute(
-                                        route:       route,
-                                        savedAt:     meta[doc.documentID]?.0,
-                                        isPurchased: meta[doc.documentID]?.1 ?? false
-                                    )
-                                )
-                            }
-                            group.leave()
-                        }
-                }
-                
-                group.notify(queue: .main) { [weak self] in
-                    Task { @MainActor in
-                        self?.routes = collected.sorted {
-                            ($0.savedAt ?? .distantPast) > ($1.savedAt ?? .distantPast)
-                        }
-                    }
-                }
-            }
-    }
-    
-    func unsave(routeID: String) async {
-        guard let uid = auth.currentUser?.uid else {
-            errorMessage = "Unable to get user UID"
-            return
-        }
-        
-        // optimistic UI update
-        if let idx = routes.firstIndex(where: { $0.id == routeID }) {
-            _ = withAnimation { routes.remove(at: idx) }
-        }
-        
+
         do {
-            try await db.collection("users")
-                .document(uid)
-                .collection("savedRoutes")
-                .document(routeID)
-                .delete()
+            let row: UserRow = try await supabase
+                .from("users")
+                .select("full_name, username, registration_date, cities(name)")
+                .eq("id", value: uid)
+                .single()
+                .execute()
+                .value
+            displayName      = row.fullName ?? "Unknown User"
+            handle           = row.username ?? "user"
+            city             = row.cities?.name ?? ""
+            registrationDate = row.registrationDate
         } catch {
-            fetchSavedRoutes()
             errorMessage = error.localizedDescription
         }
     }
-    
-    @MainActor
-    private func loadWishlist(ids: Set<String>) async {
-        guard !ids.isEmpty else { wishlist = []; return }
-        
-        let idArray = Array(ids)
-        let chunks = stride(from: 0, to: idArray.count, by: 10)
-            .map { Array(idArray[$0..<min($0+10, idArray.count)]) }
-        
-        var collected: [SavedRoute] = []
-        for chunk in chunks {
-            if let qs = try? await db.collection("routes")
-                .whereField(FieldPath.documentID(), in: chunk)
-                .getDocuments() {
-                
-                for doc in qs.documents {
-                    let d = doc.data()
-                    let route = TourRoute(
-                        id:          doc.documentID,
-                        title:       d["title"]        as? String ?? "Untitled",
-                        authorUID:   d["authorUID"]    as? String ?? "",
-                        rating:      d["rating"]       as? Double ?? 0,
-                        reviewCount: d["reviewCount"]  as? Int ?? 0,
-                        duration:    d["duration"]     as? Double ?? 0,
-                        tags:        (d["tags"] as? [Any])?.compactMap { $0 as? String } ?? [],
-                        price:       d["price"]        as? Double,
-                        thumbnailURL:(d["thumbnailURL"] as? String).flatMap(URL.init),
-                        stopsCount:  d["stopsCount"]   as? Int ?? 0
-                    )
-                    collected.append(
-                        SavedRoute(route: route,
-                                   savedAt: nil,
-                                   isPurchased: false)
-                    )
-                }
+
+    // MARK: - Saved routes
+
+    func fetchSavedRoutes() async {
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
+
+        struct SavedRouteRow: Decodable {
+            let savedAt: Date?
+            let routes: TourRoute
+            enum CodingKeys: String, CodingKey {
+                case savedAt = "saved_at"
+                case routes
             }
         }
-        wishlist = collected.sorted { $0.route.title < $1.route.title }
+
+        do {
+            let rows: [SavedRouteRow] = try await supabase
+                .from("saved_routes")
+                .select("saved_at, routes(*)")
+                .eq("user_id", value: uid)
+                .order("saved_at", ascending: false)
+                .execute()
+                .value
+
+            let mapped = rows.map { SavedRoute(route: $0.routes, savedAt: $0.savedAt) }
+            routes   = mapped
+            wishlist = mapped   // wishlist mirrors saved routes
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
-    
-    func unwish(routeID: String) {
-        Task { try? await wishlistSvc.set(false, routeID: routeID) }
+
+    func unsave(routeID: String) async {
+        if let idx = routes.firstIndex(where: { $0.id == routeID }) {
+            routes.remove(at: idx)
+            wishlist = routes
+        }
+        try? await SavedRoutesService().remove(routeID: routeID)
     }
-    
+
+    func unwish(routeID: String) { Task { try? await WishlistService().set(false, routeID: routeID) } }
+
+    // MARK: - Reviews
+
     func loadReviews() {
-        Task { @MainActor in
+        Task {
             do   { myReviews = try await reviewSvc.fetchMyReviews() }
             catch { errorMessage = error.localizedDescription }
         }
     }
 
-    @MainActor
     func update(review: UserReview) async {
         myReviews = myReviews.map { $0.routeID == review.routeID ? review : $0 }
         _ = try? await reviewSvc.upsert(review: review)
     }
 
-    @MainActor
     func delete(review: UserReview) async {
         try? await reviewSvc.delete(review: review)
-        myReviews.removeAll { $0.routeID == review.routeID }
+        myReviews.removeAll { $0.id == review.id }
     }
-    
-    @MainActor
+
     func create(review: UserReview) async {
         do {
             try await reviewSvc.create(review: review)
@@ -250,5 +158,4 @@ class ProfileViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
-
 }

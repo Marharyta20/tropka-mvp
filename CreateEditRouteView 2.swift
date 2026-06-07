@@ -1,7 +1,6 @@
 import SwiftUI
 import CoreLocation
 import MapboxMaps
-import FirebaseFirestore
 
 struct CreateEditRouteView: View {
     enum Mode: Equatable { case create, edit(routeID: String) }
@@ -13,8 +12,6 @@ struct CreateEditRouteView: View {
     @State private var showSearch = false
     @State private var isSaving = false
     @State private var errorMessage: String?
-
-    // ❌ УДАЛЕНО: map bindings больше не нужны, MapRepresentable работает сам
 
     var body: some View {
         NavigationStack {
@@ -107,7 +104,8 @@ struct CreateEditRouteView: View {
             Stop(
                 id: s.id,
                 name: s.name,
-                coordinates: s.coordinates,
+                lat: s.lat,
+                lng: s.lng,
                 orderIndex: idx + 1,
                 timeSpent: s.timeSpent,
                 photoURL: s.photoURL,
@@ -117,11 +115,11 @@ struct CreateEditRouteView: View {
     }
 
     private func addStop(from result: MapboxSearchResult) {
-        let geo = GeoPoint(latitude: result.coordinate.latitude, longitude: result.coordinate.longitude)
         let new = Stop(
             id: UUID().uuidString,
             name: result.name,
-            coordinates: geo,
+            lat: result.coordinate.latitude,
+            lng: result.coordinate.longitude,
             orderIndex: (stops.last?.orderIndex ?? 0) + 1,
             timeSpent: 15,
             photoURL: nil,

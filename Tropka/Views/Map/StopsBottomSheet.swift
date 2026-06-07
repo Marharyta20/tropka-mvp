@@ -1,6 +1,5 @@
 import SwiftUI
 import SDWebImageSwiftUI
-import FirebaseFirestore   // for GeoPoint → if you ever need
 
 // MARK: – Public entry
 struct StopsBottomSheet: View {

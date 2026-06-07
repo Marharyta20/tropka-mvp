@@ -1,44 +1,32 @@
 import SwiftUI
 import Combine
 
-@MainActor // Весь код выполняется в главном потоке (для UI)
+@MainActor
 class ExploreViewModel: ObservableObject {
-    
     @Published var routes: [TourRoute] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
-    // Поисковой запрос
     @Published var searchText = ""
-    
-    private var allRoutes: [TourRoute] = [] // Храним копию для фильтрации
-    
-    init() {
-        // Загружаем данные сразу при создании
-        loadRoutes()
-    }
-    
+
+    private var allRoutes: [TourRoute] = []
+
+    init() { loadRoutes() }
+
     func loadRoutes() {
         isLoading = true
         errorMessage = nil
-        
         Task {
             do {
-                // 1. Одна строчка вместо огромного блока кода!
-                let fetchedRoutes = try await FirestoreService.shared.fetchRoutes()
-                
-                self.allRoutes = fetchedRoutes
-                self.routes = fetchedRoutes
-                
+                let fetched = try await SupabaseService.shared.fetchRoutes()
+                allRoutes = fetched
+                routes    = fetched
             } catch {
-                self.errorMessage = error.localizedDescription
+                errorMessage = error.localizedDescription
             }
-            
-            self.isLoading = false
+            isLoading = false
         }
     }
-    
-    // Простая фильтрация (Smart Search)
+
     func filterRoutes() {
         if searchText.isEmpty {
             routes = allRoutes

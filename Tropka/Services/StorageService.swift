@@ -1,20 +1,25 @@
 import Foundation
-import FirebaseStorage
+import Storage
+
+// MARK: - StorageService (Supabase Storage)
 
 final class StorageService {
-  static let shared = StorageService()
-  private let storageRef = Storage.storage().reference()
+    static let shared = StorageService()
+    private init() {}
 
-  /// Uploads raw image/video data to `path` and returns the public URL
-  func uploadImage(_ data: Data, path: String) async throws -> URL {
-    let ref = storageRef.child(path)
-    _ = try await ref.putDataAsync(data)
-    return try await ref.downloadURL()
-  }
+    private let bucket = "tropka-media"
 
-  /// Fetches the download URL for a given storage path
-  func downloadURL(for path: String) async throws -> URL {
-    let ref = storageRef.child(path)
-    return try await ref.downloadURL()
-  }
+    /// Uploads raw image data and returns the public URL.
+    func uploadImage(_ data: Data, path: String) async throws -> URL {
+        _ = try await supabase.storage
+            .from(bucket)
+            .upload(path, data: data, options: FileOptions(contentType: "image/jpeg"))
+
+        return try supabase.storage.from(bucket).getPublicURL(path: path)
+    }
+
+    /// Returns the public URL for an existing path without uploading.
+    func publicURL(for path: String) throws -> URL {
+        try supabase.storage.from(bucket).getPublicURL(path: path)
+    }
 }

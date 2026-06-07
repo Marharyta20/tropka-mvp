@@ -129,6 +129,7 @@ struct TourDetailsView: View {
                   ?? UserReview(
                          id: "",
                          routeID: route.id,
+                         userID: supabase.auth.currentUser?.id.uuidString ?? "",
                          routeTitle: route.title,
                          rating: 5,
                          text: "",

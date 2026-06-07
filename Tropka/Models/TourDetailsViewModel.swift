@@ -1,5 +1,4 @@
 import Foundation
-import FirebaseFirestore
 import Combine
 import CoreLocation
 import MapboxDirections
@@ -71,7 +70,7 @@ final class TourDetailsViewModel: ObservableObject {
     }
 
     private func fetchStops(routeID: String) async throws -> [Stop] {
-        try await FirestoreService.shared.fetchStops(for: routeID)
+        try await SupabaseService.shared.fetchStops(for: routeID)
     }
 
     // ✅ Генерируем маршруты так, как ожидает Navigation SDK v3 (через routingProvider)

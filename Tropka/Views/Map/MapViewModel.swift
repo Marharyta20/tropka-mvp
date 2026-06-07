@@ -1,6 +1,5 @@
 import Combine
 import CoreLocation
-import FirebaseFirestore
 import Foundation
 
 /// View-model providing places for the map and filtering logic.
@@ -29,31 +28,75 @@ final class MapViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Load from Supabase
+
     func loadPlaces() {
-        // TODO: Load from Firestore. Using mock data for now.
-        places = [
-            Place(
-                id: "1",
-                name: "Forum Café",
-                category: .cafe,
-                coordinates: CLLocationCoordinate2D(latitude: 52.231, longitude: 21.01),
-                rating: 4.8,
-                reviewCount: 156,
+        Task {
+            do {
+                let loaded = try await fetchPlaces()
+                await MainActor.run { self.places = loaded }
+            } catch {
+                print("❌ MapViewModel: failed to load places:", error)
+            }
+        }
+    }
+
+    private func fetchPlaces() async throws -> [Place] {
+        struct PlaceRow: Decodable {
+            let id: Int
+            let name: String
+            let lat: Double?
+            let lng: Double?
+            let ratingScore: Double?
+            let ratingReviews: Int?
+            let tags: [String]?
+            let photoUrl: String?
+            let categoryId: Int?
+
+            enum CodingKeys: String, CodingKey {
+                case id, name, lat, lng, tags
+                case ratingScore   = "rating_score"
+                case ratingReviews = "rating_reviews"
+                case photoUrl      = "photo_url"
+                case categoryId    = "category_id"
+            }
+        }
+
+        let rows: [PlaceRow] = try await supabase
+            .from("places")
+            .select("id, name, lat, lng, rating_score, rating_reviews, tags, photo_url, category_id")
+            .limit(300)
+            .execute()
+            .value
+
+        return rows.compactMap { row in
+            guard let lat = row.lat, let lng = row.lng else { return nil }
+            return Place(
+                id: String(row.id),
+                name: row.name,
+                category: placeCategory(for: row.categoryId),
+                coordinates: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+                rating: row.ratingScore ?? 0,
+                reviewCount: row.ratingReviews ?? 0,
                 isOpenNow: true,
-                tags: ["coffee", "cozy", "wifi"],
-                photoURL: nil
-            ),
-            Place(
-                id: "2",
-                name: "Old Town Market",
-                category: .shopping,
-                coordinates: CLLocationCoordinate2D(latitude: 52.235, longitude: 21.02),
-                rating: 4.5,
-                reviewCount: 89,
-                isOpenNow: true,
-                tags: ["local", "souvenirs", "historic"],
-                photoURL: nil
+                tags: row.tags ?? [],
+                photoURL: row.photoUrl.flatMap(URL.init)
             )
-        ]
+        }
+    }
+
+    // Maps category_id from the DB categories table to the PlaceCategory enum.
+    // Adjust IDs once you confirm them in the Supabase categories table.
+    private func placeCategory(for id: Int?) -> PlaceCategory {
+        switch id {
+        case 1:  return .restaurant
+        case 2:  return .cafe
+        case 3:  return .museum
+        case 4:  return .park
+        case 5:  return .shopping
+        case 6:  return .nightlife
+        case 7:  return .historical
+        default: return .cafe
+        }
     }
 }

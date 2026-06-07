@@ -1,89 +1,109 @@
 import Foundation
-import FirebaseFirestore
+
+// MARK: - TipsViewModel
+// Loads tips + their pages from Supabase in a single query (join).
 
 @MainActor
 final class TipsViewModel: ObservableObject {
-
-    // UI-binding
     @Published var tips:          [Tip] = []
-    @Published var isLoading        = false
-    @Published var isLoadingMore    = false
-    @Published var errorMessage: String?
+    @Published var isLoading      = false
+    @Published var isLoadingMore  = false
+    @Published var errorMessage:  String?
 
-    private let db      = Firestore.firestore()
-    private var lastDoc: DocumentSnapshot?          // cursor
+    private var hasMore = true
 
-    // MARK: first page
+    // MARK: - Row types
+
+    private struct TipRow: Decodable {
+        let id: String
+        let title: String
+        let bannerUrl: String?
+        let tipPages: [PageRow]?
+
+        struct PageRow: Decodable {
+            let id: String
+            let orderIndex: Int
+            let header: String?
+            let body: String?
+            let footer: String?
+            let imageUrl: String?
+
+            enum CodingKeys: String, CodingKey {
+                case id
+                case orderIndex = "order_index"
+                case header, body, footer
+                case imageUrl = "image_url"
+            }
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id, title
+            case bannerUrl = "banner_url"
+            case tipPages = "tip_pages"
+        }
+    }
+
+    // MARK: - Load first page
+
     func reload() async {
         guard !isLoading else { return }
-        isLoading  = true
-        errorMessage = nil
+        isLoading = true
         defer { isLoading = false }
 
         do {
-            let snap = try await db.collection("tips")
-                                   .order(by: "title")        // индекс!
-                                   .limit(to: 10)
-                                   .getDocuments()
+            let rows: [TipRow] = try await supabase
+                .from("tips")
+                .select("id, title, banner_url, tip_pages(id, order_index, header, body, footer, image_url)")
+                .order("title")
+                .limit(20)
+                .execute()
+                .value
 
-            tips     = try await parse(snapshot: snap)
-            lastDoc  = snap.documents.last
-
+            tips = rows.map { Self.makeTip($0) }
+            hasMore = rows.count == 20
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    // MARK: next page
+    // MARK: - Load next page
+
     func fetchMore() async {
-        guard !isLoadingMore, let last = lastDoc else { return }
+        guard !isLoadingMore, hasMore else { return }
         isLoadingMore = true
         defer { isLoadingMore = false }
 
         do {
-            let snap = try await db.collection("tips")
-                                   .order(by: "title")
-                                   .start(afterDocument: last)
-                                   .limit(to: 10)
-                                   .getDocuments()
+            let rows: [TipRow] = try await supabase
+                .from("tips")
+                .select("id, title, banner_url, tip_pages(id, order_index, header, body, footer, image_url)")
+                .order("title")
+                .range(from: tips.count, to: tips.count + 9)
+                .execute()
+                .value
 
-            let more = try await parse(snapshot: snap)
-            tips.append(contentsOf: more)
-            lastDoc = snap.documents.last
-
+            tips.append(contentsOf: rows.map { Self.makeTip($0) })
+            hasMore = rows.count == 10
         } catch {
-            print("🔥 Pagination error:", error)
+            print("TipsViewModel fetchMore error:", error)
         }
     }
 
-    // MARK: helper
-    private func parse(snapshot: QuerySnapshot) async throws -> [Tip] {
-        var result: [Tip] = []
+    // MARK: - Helper
 
-        for doc in snapshot.documents {
-            let data       = doc.data()
-            let tipID      = doc.documentID
-            let title      = data["title"]     as? String ?? ""
-            let bannerURL  = data["bannerURL"] as? String ?? ""
-
-            var tip = Tip(id: tipID, title: title, bannerURL: bannerURL)
-
-            // load pages
-            let pagesSnap = try await db.collection("tips")
-                                        .document(tipID)
-                                        .collection("pages")
-                                        .getDocuments()
-
-            tip.pages = pagesSnap.documents.map { p in
-                let pd = p.data()
-                return TipPage(id: p.documentID,
-                               imageURL: pd["imageURL"] as? String ?? "",
-                               header:   pd["header"]   as? String ?? "",
-                               body:     pd["body"]     as? String ?? "",
-                               footer:   pd["footer"]   as? String)
+    private static func makeTip(_ row: TipRow) -> Tip {
+        var tip = Tip(id: row.id, title: row.title, bannerURL: row.bannerUrl ?? "")
+        tip.pages = (row.tipPages ?? [])
+            .sorted { $0.orderIndex < $1.orderIndex }
+            .map { p in
+                TipPage(
+                    id: p.id,
+                    imageURL: p.imageUrl ?? "",
+                    header: p.header ?? "",
+                    body: p.body ?? "",
+                    footer: p.footer
+                )
             }
-            result.append(tip)
-        }
-        return result
+        return tip
     }
 }

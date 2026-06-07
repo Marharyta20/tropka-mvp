@@ -10,16 +10,13 @@ final class RoutesViewModel: ObservableObject {
     func loadRoutes() {
         isLoading = true
         errorMsg = nil
-        
-        Task{
+        Task {
             do {
-                let fetchedRoutes = try await FirestoreService.shared.fetchRoutes()
-                self.routes = fetchedRoutes
+                routes = try await SupabaseService.shared.fetchRoutes()
             } catch {
-                self.errorMsg = error.localizedDescription
+                errorMsg = error.localizedDescription
             }
-            
-            self.isLoading = false
+            isLoading = false
         }
     }
 }

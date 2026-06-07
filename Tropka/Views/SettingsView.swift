@@ -15,10 +15,6 @@ struct SettingsView: View {
                 editableField(title: "FULL NAME", text: $vm.displayName,
                               keyboard: UIKeyboardType.default)
 
-                //–– City
-                editableField(title: "CITY", text: $vm.city,
-                              keyboard: UIKeyboardType.default)
-
                 //–– Username
                 editableField(title: "USERNAME", text: $vm.username,
                               keyboard: UIKeyboardType.asciiCapable)
@@ -28,7 +24,6 @@ struct SettingsView: View {
                     Task {
                         await vm.save()
                         profileVM.displayName = vm.displayName
-                        profileVM.city        = vm.city
                         profileVM.handle      = vm.username
                         showSaved = true
                     }

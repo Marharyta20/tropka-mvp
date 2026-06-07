@@ -1,7 +1,6 @@
 import SwiftUI
 import CoreLocation
 import MapboxMaps // Вы импортировали Mapbox, но этот экран использует Apple Maps (MapKit)
-import FirebaseFirestore
 import UIKit
 import MapKit
 

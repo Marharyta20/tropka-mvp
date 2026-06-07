@@ -12,13 +12,16 @@
 		A8818FC62F0D641F0068B9E9 /* CreateEditRouteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8818FC52F0D641F0068B9E9 /* CreateEditRouteView.swift */; };
 		A8818FC82F0D641F0068B9E9 /* CreateEditRouteView 2.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8818FC72F0D641F0068B9E9 /* CreateEditRouteView 2.swift */; };
 		A8818FCA2F0D65430068B9E9 /* RouteEditorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8818FC92F0D65430068B9E9 /* RouteEditorService.swift */; };
-		A8ACB9B72F0EE1B800170910 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACB9B62F0EE1B800170910 /* FirebaseAuth */; };
-		A8ACB9B92F0EE1B800170910 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACB9B82F0EE1B800170910 /* FirebaseFirestore */; };
-		A8ACB9BB2F0EE1B800170910 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACB9BA2F0EE1B800170910 /* FirebaseStorage */; };
 		A8ACB9BE2F0EE20800170910 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACB9BD2F0EE20800170910 /* SDWebImageSwiftUI */; };
 		A8ACBA2E2F0EED0900170910 /* MapboxDirections in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACBA2D2F0EED0900170910 /* MapboxDirections */; };
 		A8ACBA302F0EED0900170910 /* MapboxNavigationCore in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACBA2F2F0EED0900170910 /* MapboxNavigationCore */; };
 		A8ACBA322F0EED0900170910 /* MapboxNavigationUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACBA312F0EED0900170910 /* MapboxNavigationUIKit */; };
+		A8FF8CE22FD5ED3200361A67 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CE12FD5ED3200361A67 /* Supabase */; };
+		A8FF8CD82FD5ED3200361A67 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CD72FD5ED3200361A67 /* Auth */; };
+		A8FF8CDA2FD5ED3200361A67 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CD92FD5ED3200361A67 /* Functions */; };
+		A8FF8CDC2FD5ED3200361A67 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CDB2FD5ED3200361A67 /* PostgREST */; };
+		A8FF8CDE2FD5ED3200361A67 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CDD2FD5ED3200361A67 /* Realtime */; };
+		A8FF8CE02FD5ED3200361A67 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CDF2FD5ED3200361A67 /* Storage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,13 +88,16 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A8FF8CE22FD5ED3200361A67 /* Supabase in Frameworks */,
+				A8FF8CDA2FD5ED3200361A67 /* Functions in Frameworks */,
 				A8ACBA302F0EED0900170910 /* MapboxNavigationCore in Frameworks */,
+				A8FF8CDC2FD5ED3200361A67 /* PostgREST in Frameworks */,
+				A8FF8CDE2FD5ED3200361A67 /* Realtime in Frameworks */,
 				A8ACBA2E2F0EED0900170910 /* MapboxDirections in Frameworks */,
 				A8ACB9BE2F0EE20800170910 /* SDWebImageSwiftUI in Frameworks */,
-				A8ACB9B72F0EE1B800170910 /* FirebaseAuth in Frameworks */,
-				A8ACB9B92F0EE1B800170910 /* FirebaseFirestore in Frameworks */,
+				A8FF8CE02FD5ED3200361A67 /* Storage in Frameworks */,
+				A8FF8CD82FD5ED3200361A67 /* Auth in Frameworks */,
 				A8ACBA322F0EED0900170910 /* MapboxNavigationUIKit in Frameworks */,
-				A8ACB9BB2F0EE1B800170910 /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -165,13 +171,16 @@
 			);
 			name = Tropka;
 			packageProductDependencies = (
-				A8ACB9B62F0EE1B800170910 /* FirebaseAuth */,
-				A8ACB9B82F0EE1B800170910 /* FirebaseFirestore */,
-				A8ACB9BA2F0EE1B800170910 /* FirebaseStorage */,
 				A8ACB9BD2F0EE20800170910 /* SDWebImageSwiftUI */,
 				A8ACBA2D2F0EED0900170910 /* MapboxDirections */,
 				A8ACBA2F2F0EED0900170910 /* MapboxNavigationCore */,
 				A8ACBA312F0EED0900170910 /* MapboxNavigationUIKit */,
+				A8FF8CE12FD5ED3200361A67 /* Supabase */,
+				A8FF8CD72FD5ED3200361A67 /* Auth */,
+				A8FF8CD92FD5ED3200361A67 /* Functions */,
+				A8FF8CDB2FD5ED3200361A67 /* PostgREST */,
+				A8FF8CDD2FD5ED3200361A67 /* Realtime */,
+				A8FF8CDF2FD5ED3200361A67 /* Storage */,
 			);
 			productName = Tropka;
 			productReference = A87F86A12DCB4DE700462F82 /* Tropka.app */;
@@ -256,9 +265,9 @@
 			mainGroup = A87F86982DCB4DE700462F82;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				A8ACB9B52F0EE1B800170910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				A8ACB9BC2F0EE20800170910 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
 				A8ACBA2C2F0EED0900170910 /* XCRemoteSwiftPackageReference "mapbox-navigation-ios" */,
+				A8FF8CD62FD5ED3200361A67 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A87F86A22DCB4DE700462F82 /* Products */;
@@ -636,14 +645,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		A8ACB9B52F0EE1B800170910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 12.7.0;
-			};
-		};
 		A8ACB9BC2F0EE20800170910 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/SDWebImage/SDWebImageSwiftUI";
@@ -660,24 +661,17 @@
 				minimumVersion = 3.17.0;
 			};
 		};
+		A8FF8CD62FD5ED3200361A67 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		A8ACB9B62F0EE1B800170910 /* FirebaseAuth */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A8ACB9B52F0EE1B800170910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAuth;
-		};
-		A8ACB9B82F0EE1B800170910 /* FirebaseFirestore */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A8ACB9B52F0EE1B800170910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseFirestore;
-		};
-		A8ACB9BA2F0EE1B800170910 /* FirebaseStorage */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A8ACB9B52F0EE1B800170910 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseStorage;
-		};
 		A8ACB9BD2F0EE20800170910 /* SDWebImageSwiftUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A8ACB9BC2F0EE20800170910 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;
@@ -697,6 +691,36 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A8ACBA2C2F0EED0900170910 /* XCRemoteSwiftPackageReference "mapbox-navigation-ios" */;
 			productName = MapboxNavigationUIKit;
+		};
+		A8FF8CD72FD5ED3200361A67 /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A8FF8CD62FD5ED3200361A67 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		A8FF8CD92FD5ED3200361A67 /* Functions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A8FF8CD62FD5ED3200361A67 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Functions;
+		};
+		A8FF8CDB2FD5ED3200361A67 /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A8FF8CD62FD5ED3200361A67 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		A8FF8CDD2FD5ED3200361A67 /* Realtime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A8FF8CD62FD5ED3200361A67 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+		A8FF8CDF2FD5ED3200361A67 /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A8FF8CD62FD5ED3200361A67 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
+		};
+		A8FF8CE12FD5ED3200361A67 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A8FF8CD62FD5ED3200361A67 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

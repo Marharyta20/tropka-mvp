@@ -1,77 +1,92 @@
-import Foundation
-import FirebaseAuth
-import FirebaseFirestore
+import SwiftUI
 
 @MainActor
 class SettingsViewModel: ObservableObject {
     @Published var displayName = ""
-    @Published var city        = ""
-    @Published var username    = ""
+    @Published var username = ""
     @Published var error: String?
-    @Published var isBusy = false          // для спиннера
-    
-    private let db   = Firestore.firestore()
-    private let auth = Auth.auth()
-    
+    @Published var isBusy = false
+
     init() { Task { await load() } }
-    
-    // MARK: load current values
+
+    // MARK: - Load
+
     func load() async {
-        guard let uid = auth.currentUser?.uid else { return }
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
+
+        struct UserRow: Decodable {
+            let fullName: String?
+            let username: String?
+            enum CodingKeys: String, CodingKey {
+                case fullName = "full_name"
+                case username
+            }
+        }
+
         do {
-            let snap = try await db.collection("users").document(uid).getDocument()
-            guard let data = snap.data() else { return }
-            displayName = data["fullName"] as? String ?? ""
-            city        = data["city"]     as? String ?? ""
-            username    = data["username"] as? String ?? ""
+            let row: UserRow = try await supabase
+                .from("users")
+                .select("full_name, username")
+                .eq("id", value: uid)
+                .single()
+                .execute()
+                .value
+            displayName = row.fullName ?? ""
+            username    = row.username ?? ""
         } catch {
             self.error = error.localizedDescription
         }
     }
-    
-    // MARK: save name + city
+
+    // MARK: - Save
+
     func save() async {
-        guard let uid = auth.currentUser?.uid else { return }
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
         isBusy = true
-        
+        defer { isBusy = false }
+
+        struct UserUpdate: Encodable {
+            let fullName: String
+            let username: String
+            enum CodingKeys: String, CodingKey {
+                case fullName = "full_name"
+                case username
+            }
+        }
+
         do {
-            let data: [String: Any] = [
-                "fullName" : displayName,
-                "city"     : city,
-                "username" : username
-            ]
-            try await db.collection("users").document(uid).updateData(data)
-            isBusy = false
+            try await supabase
+                .from("users")
+                .update(UserUpdate(fullName: displayName, username: username))
+                .eq("id", value: uid)
+                .execute()
         } catch {
-            isBusy = false
             self.error = error.localizedDescription
         }
     }
-    
-    // MARK: sign out
+
+    // MARK: - Sign Out
+
     func signOut() {
-        try? auth.signOut()
+        Task { try? await supabase.auth.signOut() }
     }
-    
-    // MARK: delete account
+
+    // MARK: - Delete Account
+
     func deleteAccount() async {
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
         isBusy = true
+        defer { isBusy = false }
         do {
-            guard let user = auth.currentUser else { return }
-            // удаляем Firestore-док
-            try await db.collection("users").document(user.uid).delete()
-            // удаляем auth-пользователя
-            try await user.delete()
-            isBusy = false
+            try await supabase.from("users").delete().eq("id", value: uid).execute()
+            try await supabase.auth.signOut()
         } catch {
-            isBusy = false
             self.error = error.localizedDescription
         }
     }
-    
+
     func prefill(with p: ProfileViewModel) {
         displayName = p.displayName
-        city        = p.city
         username    = p.handle
     }
 }

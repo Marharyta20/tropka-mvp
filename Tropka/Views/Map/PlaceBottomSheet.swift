@@ -9,6 +9,7 @@ struct PlaceBottomSheet: View {
 
     @State private var isDragging = false
     @State private var relatedRoutes: [TourRoute] = []
+    @State private var isLoadingRoutes = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -37,6 +38,13 @@ struct PlaceBottomSheet: View {
             .shadow(radius: 10)
             .offset(y: geometry.size.height - height)
             .gesture(dragGesture)
+            .task(id: place?.id) {
+                guard let placeID = place?.id else {
+                    relatedRoutes = []
+                    return
+                }
+                await loadRelatedRoutes(placeID: placeID)
+            }
         }
     }
 
@@ -120,7 +128,11 @@ struct PlaceBottomSheet: View {
                         .font(.headline)
                         .padding(.horizontal, 20)
 
-                    if relatedRoutes.isEmpty {
+                    if isLoadingRoutes {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 20)
+                    } else if relatedRoutes.isEmpty {
                         Text("No tours include this place yet")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -166,6 +178,30 @@ struct PlaceBottomSheet: View {
                     }
                 }
             }
+    }
+
+    // MARK: - Data loading
+
+    private func loadRelatedRoutes(placeID: String) async {
+        guard let placeIDInt = Int(placeID) else { return }
+        isLoadingRoutes = true
+        defer { isLoadingRoutes = false }
+
+        do {
+            struct RouteStopRow: Decodable {
+                let routes: TourRoute
+            }
+            let rows: [RouteStopRow] = try await supabase
+                .from("route_stops")
+                .select("routes(*)")
+                .eq("place_id", value: placeIDInt)
+                .execute()
+                .value
+            relatedRoutes = rows.map(\.routes)
+        } catch {
+            print("PlaceBottomSheet: failed to load related routes:", error)
+            relatedRoutes = []
+        }
     }
 
     private func formatDistance(_ meters: Double) -> String {

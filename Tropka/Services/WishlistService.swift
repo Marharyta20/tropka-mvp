@@ -1,30 +1,22 @@
-import FirebaseAuth
-import FirebaseFirestore
+import Foundation
+
+// MARK: - WishlistService
+// Note: Supabase `wishlist` table stores place_id (places), not route_id.
+// Route-level "wishlist" (heart button) is mapped to saved_routes in this app
+// so both the Save and Heart buttons share the same backing table.
 
 struct WishlistService {
-    private let db   = Firestore.firestore()
-    private let auth = Auth.auth()
-    
+    private let saveService = SavedRoutesService()
+
     func set(_ wished: Bool, routeID: String) async throws {
-        guard let uid = auth.currentUser?.uid else {
-            throw URLError(.userAuthenticationRequired)
-        }
-        let ref = db.collection("users")
-            .document(uid)
-            .collection("wishlist")
-            .document(routeID)
-        
         if wished {
-            try await ref.setData(["savedAt": Timestamp(date: Date())])
+            try await saveService.save(routeID: routeID)
         } else {
-            try await ref.delete()
+            try await saveService.remove(routeID: routeID)
         }
     }
-    
+
     func isWished(_ routeID: String) async -> Bool {
-        guard let uid = auth.currentUser?.uid else { return false }
-        let snap = try? await db.collection("users").document(uid)
-            .collection("wishlist").document(routeID).getDocument()
-        return snap?.exists ?? false
+        await saveService.isSaved(routeID: routeID)
     }
 }

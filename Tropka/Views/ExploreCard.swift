@@ -37,11 +37,27 @@ struct ExploreCard: View {
         VStack(alignment: .leading, spacing: 12) {
             
             //–– Cover
-            WebImage(url: route.thumbnailURL)
-                .resizable()
-                .scaledToFill()
-                .frame(height: 200)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+            Group {
+                if let url = route.thumbnailURL {
+                    WebImage(url: url) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .overlay(ProgressView())
+                    }
+                } else {
+                    Rectangle()
+                        .fill(Color(.systemGray5))
+                        .overlay(
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundColor(.secondary)
+                        )
+                }
+            }
+            .frame(height: 200)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
             
             //–– Title + price/free badge ─────────────────────────────
             HStack(alignment: .top, spacing: 8) {
