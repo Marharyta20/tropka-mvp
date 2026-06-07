@@ -42,6 +42,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		AA11BB22CC33DD44EE55FF66 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Secrets.xcconfig; path = Secrets.xcconfig; sourceTree = SOURCE_ROOT; };
 		A87F86A12DCB4DE700462F82 /* Tropka.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tropka.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A87F86B12DCB4DE900462F82 /* TropkaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TropkaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A87F86BB2DCB4DE900462F82 /* TropkaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TropkaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -121,6 +122,7 @@
 		A87F86982DCB4DE700462F82 = {
 			isa = PBXGroup;
 			children = (
+				AA11BB22CC33DD44EE55FF66 /* Secrets.xcconfig */,
 				A87F86A32DCB4DE700462F82 /* Tropka */,
 				A87F86B42DCB4DE900462F82 /* TropkaTests */,
 				A87F86BE2DCB4DE900462F82 /* TropkaUITests */,
@@ -473,6 +475,7 @@
 		};
 		A87F86C62DCB4DE900462F82 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA11BB22CC33DD44EE55FF66 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -505,6 +508,7 @@
 		};
 		A87F86C72DCB4DE900462F82 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA11BB22CC33DD44EE55FF66 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

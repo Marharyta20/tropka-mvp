@@ -57,6 +57,16 @@ final class TourDetailsViewModel: ObservableObject {
         }
     }
 
+    func unsaveRoute(routeID: String) async {
+        guard isSaved else { return }
+        do {
+            try await saveSvc.remove(routeID: routeID)
+            self.isSaved = false
+        } catch {
+            self.errorMsg = error.localizedDescription
+        }
+    }
+
     func saveReview(_ review: UserReview) async {
         do {
             self.myReview = try await reviewSvc.upsert(review: review)

@@ -3,10 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>MBXAccessToken</key>
-	<string>pk.eyJ1IjoidHJhdmVsYXBwLWNvbSIsImEiOiJjbWFpNDk3cWcwaWZqMmtzNzBsZmh0eG9rIn0.SMeV0YAQGa0riQZ9jvc5aQ</string>
+	<string>$(MBXAccessToken)</string>
         <key>MGLMapboxAccessToken</key>
-        <string>pk.eyJ1IjoidHJhdmVsYXBwLWNvbSIsImEiOiJjbWFpNDk3cWcwaWZqMmtzNzBsZmh0eG9rIn0.SMeV0YAQGa0riQZ9jvc5aQ</string>
+        <string>$(MGLMapboxAccessToken)</string>
         <key>NSLocationWhenInUseUsageDescription</key>
         <string>This app needs your location to show where you are on the map.</string>
+        <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+        <string>This app uses your location for navigation guidance.</string>
+        <key>UIBackgroundModes</key>
+        <array>
+            <string>audio</string>
+            <string>location</string>
+        </array>
 </dict>
 </plist>

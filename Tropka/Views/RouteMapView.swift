@@ -4,37 +4,26 @@ import MapboxNavigationUIKit
 
 struct RouteMapView: View {
     @ObservedObject var vm: TourDetailsViewModel
+    @State private var selectedStopIndex: Int = 0
 
     var body: some View {
         ZStack(alignment: .bottom) {
+            // Map — full screen
             MapRepresentable(
                 stops: vm.stops,
-                routeCoords: vm.routeCoords
+                routeCoords: vm.routeCoords,
+                selectedStopIndex: selectedStopIndex
             )
             .edgesIgnoringSafeArea(.all)
 
-            VStack {
-                Spacer()
-
-                if vm.navigationRoutes != nil {
-                    Button {
-                        startNavigation()
-                    } label: {
-                        HStack {
-                            Image(systemName: "location.fill")
-                            Text("Start Navigation")
-                        }
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.blue)
-                        .cornerRadius(15)
-                        .padding(.horizontal, 40)
-                        .shadow(radius: 5)
-                    }
-                    .padding(.bottom, 20)
-                }
+            // Draggable stops list — nav button lives inside it
+            if !vm.stops.isEmpty {
+                StopsBottomSheet(
+                    stops: vm.stops,
+                    selectedIndex: $selectedStopIndex,
+                    navButtonAction: vm.navigationRoutes != nil ? startNavigation : nil
+                )
+                .edgesIgnoringSafeArea(.bottom)
             }
         }
         .onAppear {
@@ -46,23 +35,18 @@ struct RouteMapView: View {
             Task { await vm.buildWalkingRoute() }
         }
     }
-    
 
     private func startNavigation() {
-        guard let routes = vm.navigationRoutes else {
-            print("NavigationRoutes not ready")
-            return
-        }
-
-        let navigationViewController = NavigationViewController(
+        guard let routes = vm.navigationRoutes else { return }
+        // Reuse shared NavigationOptions from NavigationContainer
+        // to avoid "MapboxNavigationProvider instantiated twice" crash
+        let vc = NavigationViewController(
             navigationRoutes: routes,
-            navigationOptions: NavigationOptions()
+            navigationOptions: NavigationContainer.shared.navigationOptions
         )
-
-        navigationViewController.modalPresentationStyle = UIModalPresentationStyle.fullScreen
-        UIApplication.shared.topMostViewController()?.present(navigationViewController, animated: true)
+        vc.modalPresentationStyle = UIModalPresentationStyle.fullScreen
+        UIApplication.shared.topMostViewController()?.present(vc, animated: true)
     }
-
 }
 
 // MARK: - Top-most VC helper
@@ -72,11 +56,8 @@ private extension UIApplication {
             .compactMap { $0 as? UIWindowScene }
             .flatMap { $0.windows }
             .first { $0.isKeyWindow }
-
-        var topController = keyWindow?.rootViewController
-        while let presented = topController?.presentedViewController {
-            topController = presented
-        }
-        return topController
+        var top = keyWindow?.rootViewController
+        while let presented = top?.presentedViewController { top = presented }
+        return top
     }
 }
