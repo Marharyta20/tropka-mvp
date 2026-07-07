@@ -12,21 +12,18 @@ struct RouteEditorService {
         let authorUid: String
         let title: String
         let tags: [String]
-        let price: Double?
         let thumbnailUrl: String?
         let stopsCount: Int
         let duration: Int       // minutes
-        let isFree: Bool
         let rating: Double
         let reviewCount: Int
 
         enum CodingKeys: String, CodingKey {
             case authorUid   = "author_uid"
-            case title, tags, price
+            case title, tags
             case thumbnailUrl = "thumbnail_url"
             case stopsCount  = "stops_count"
             case duration
-            case isFree      = "is_free"
             case rating
             case reviewCount = "review_count"
         }
@@ -52,7 +49,7 @@ struct RouteEditorService {
 
     // MARK: - Create
 
-    func createRoute(title: String, tags: [String], price: Double?, thumbnailURL: URL?, stops: [Stop]) async throws -> String {
+    func createRoute(title: String, tags: [String], thumbnailURL: URL?, stops: [Stop]) async throws -> String {
         guard let uid = currentUID else { throw URLError(.userAuthenticationRequired) }
 
         let totalMinutes = stops.reduce(0) { $0 + max(0, $1.timeSpent) }
@@ -61,11 +58,9 @@ struct RouteEditorService {
             authorUid: uid,
             title: title,
             tags: tags,
-            price: price,
             thumbnailUrl: thumbnailURL?.absoluteString,
             stopsCount: stops.count,
             duration: totalMinutes,
-            isFree: price == nil || (price ?? 0) == 0,
             rating: 0,
             reviewCount: 0
         )
@@ -85,7 +80,7 @@ struct RouteEditorService {
 
     // MARK: - Update
 
-    func updateRoute(routeID: String, title: String, stops: [Stop], tags: [String], price: Double?, thumbnailURL: URL?) async throws {
+    func updateRoute(routeID: String, title: String, stops: [Stop], tags: [String], thumbnailURL: URL?) async throws {
         guard let uid = currentUID else { throw URLError(.userAuthenticationRequired) }
 
         let totalMinutes = stops.reduce(0) { $0 + max(0, $1.timeSpent) }
@@ -94,11 +89,9 @@ struct RouteEditorService {
             authorUid: uid,
             title: title,
             tags: tags,
-            price: price,
             thumbnailUrl: thumbnailURL?.absoluteString,
             stopsCount: stops.count,
             duration: totalMinutes,
-            isFree: price == nil || (price ?? 0) == 0,
             rating: 0,
             reviewCount: 0
         )

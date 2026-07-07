@@ -23,9 +23,6 @@ class ProfileViewModel: ObservableObject {
     // Saved routes
     @Published var routes: [SavedRoute] = []
 
-    // Wishlist (mirrors routes — both backed by saved_routes table)
-    @Published var wishlist: [SavedRoute] = []
-
     // Reviews
     @Published var myReviews: [UserReview] = []
 
@@ -113,9 +110,7 @@ class ProfileViewModel: ObservableObject {
                 .execute()
                 .value
 
-            let mapped = rows.map { SavedRoute(route: $0.routes, savedAt: $0.savedAt) }
-            routes   = mapped
-            wishlist = mapped   // wishlist mirrors saved routes
+            routes = rows.map { SavedRoute(route: $0.routes, savedAt: $0.savedAt) }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -124,12 +119,9 @@ class ProfileViewModel: ObservableObject {
     func unsave(routeID: String) async {
         if let idx = routes.firstIndex(where: { $0.id == routeID }) {
             routes.remove(at: idx)
-            wishlist = routes
         }
         try? await SavedRoutesService().remove(routeID: routeID)
     }
-
-    func unwish(routeID: String) { Task { try? await WishlistService().set(false, routeID: routeID) } }
 
     // MARK: - Reviews
 

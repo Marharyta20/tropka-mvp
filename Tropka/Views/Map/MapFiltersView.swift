@@ -11,7 +11,7 @@ struct MapFiltersView: View {
                 Section("Categories") {
                     ForEach(PlaceCategory.allCases, id: \.self) { category in
                         HStack {
-                            Label(category.rawValue.capitalized,
+                            Label(category.displayName,
                                   systemImage: category.icon)
                                 .foregroundColor(Color(category.color))
 

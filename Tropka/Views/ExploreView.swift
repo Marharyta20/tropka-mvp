@@ -4,40 +4,22 @@ struct ExploreView: View {
     @StateObject private var vm = ExploreViewModel()
     
     @State private var searchText = ""
-    @State private var showOnlyFree = false
     @State private var selectedTag: String?
-    @State private var sortBy: SortOption = .rating
-    
-    enum SortOption: String, CaseIterable, Identifiable {
-        case rating = "Rating"
-        case price = "Price"
-        var id: String { self.rawValue }
-    }
-    
+
     // — Фильтрованный массив
     var filteredRoutes: [TourRoute] {
         var result = vm.routes
-        
+
         // Фильтр: поиск
         if !searchText.isEmpty {
             result = result.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
-        }
-        // Фильтр: бесплатные
-        if showOnlyFree {
-            // ИСПРАВЛЕНИЕ: Проверяем цену напрямую, если свойства isActuallyFree нет
-            result = result.filter { ($0.price ?? 0) < 0.01 }
         }
         // Фильтр: по тегу
         if let tag = selectedTag {
             result = result.filter { $0.tags.contains(tag) }
         }
-        // Сортировка
-        switch sortBy {
-        case .rating:
-            result = result.sorted { $0.rating > $1.rating }
-        case .price:
-            result = result.sorted { ($0.price ?? 0) < ($1.price ?? 0) }
-        }
+        // Сортировка: по рейтингу
+        result = result.sorted { $0.rating > $1.rating }
         return result
     }
     
@@ -56,24 +38,6 @@ struct ExploreView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                     .padding(.horizontal, 16)
-                
-                // ——— Filters row
-                HStack(spacing: 8) {
-                    Toggle("Free only", isOn: $showOnlyFree)
-                        .font(.subheadline)
-                    
-                    Picker("Sort by", selection: $sortBy) {
-                        ForEach(SortOption.allCases) { sort in
-                            Text(sort.rawValue)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 170)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 4)
                 
                 // ——— Tag filter row
                 ScrollView(.horizontal, showsIndicators: false) {

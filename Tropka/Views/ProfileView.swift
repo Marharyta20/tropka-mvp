@@ -15,7 +15,7 @@ struct ProfileView: View {
     @State private var showDeleteConfirm = false
     @State private var editingReview: UserReview?
     
-    enum Tab { case routes, reviews, wishlist }
+    enum Tab { case routes, reviews }
     
     
     // MARK: body
@@ -89,7 +89,6 @@ struct ProfileView: View {
         HStack(spacing: 28) {
             tabButton(title: "Your Routes", tab: .routes)
             tabButton(title: "Reviews",     tab: .reviews)
-            tabButton(title: "Wishlist", tab:.wishlist)
             Spacer()
         }
     }
@@ -119,12 +118,9 @@ struct ProfileView: View {
             
         case .routes:
             routesList
-            
+
         case .reviews:
             reviewsList
-            
-        case .wishlist:
-            wishlistList
         }
     }
     
@@ -136,7 +132,7 @@ struct ProfileView: View {
                     SavedRouteMapScreen(routeID: item.route.id,
                                         title:    item.route.title)
                 } label: {
-                    ProfileRouteCell(item: item, showStatus: true)
+                    ProfileRouteCell(item: item)
                 }
                 .swipeActions {
                     Button(role: .destructive) {
@@ -188,29 +184,6 @@ struct ProfileView: View {
             }
         }
         .onAppear { vm.loadReviews() }
-    }
-    
-    // MARK: – Wishlist list
-    private var wishlistList: some View {
-        List(vm.wishlist) { item in
-            NavigationLink {
-                SavedRouteMapScreen(routeID: item.route.id,
-                                    title:    item.route.title)
-            } label: {
-                ProfileRouteCell(
-                    item: item,
-                    showStatus: false,
-                    onHeartTap: { vm.unwish(routeID: item.route.id) }
-                )
-            }
-        }
-        .listStyle(.plain)
-        .overlay {
-            if vm.wishlist.isEmpty {
-                Text("No items yet")
-                    .foregroundColor(.secondary)
-            }
-        }
     }
 }
 
@@ -311,9 +284,7 @@ struct EditReviewSheet: View {
 // MARK: route cell
 private struct ProfileRouteCell: View {
     let item: SavedRoute
-    var showStatus: Bool = true
-    var onHeartTap: (() -> Void)? = nil
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // thumbnail
@@ -351,24 +322,13 @@ private struct ProfileRouteCell: View {
             }
             
             Spacer()
-            
-            
-            if showStatus {
-                Text("Saved")
-                    .font(.caption2).bold()
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Color.blue)
-                    .clipShape(Capsule())
-            } else {
-                Button(action: { onHeartTap?() }) {
-                    Image(systemName: "heart.fill")
-                        .foregroundColor(.orange)
-                        .padding(4)
-                }
-                .buttonStyle(.plain)
-            }
-            
+
+            Text("Saved")
+                .font(.caption2).bold()
+                .foregroundColor(.white)
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(Color.blue)
+                .clipShape(Capsule())
         }
         .padding()
         .background(Color(.systemBackground))

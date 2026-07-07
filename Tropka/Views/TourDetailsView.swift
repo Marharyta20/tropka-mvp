@@ -53,7 +53,7 @@ struct TourDetailsView: View {
                         )
                         .frame(height: 280)
 
-                        // Title + badge overlaid at bottom
+                        // Title overlaid at bottom
                         VStack(alignment: .leading, spacing: 8) {
                             Text(route.title)
                                 .font(.title2.bold())
@@ -61,16 +61,6 @@ struct TourDetailsView: View {
                                 .shadow(radius: 2)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                            Label(
-                                route.isActuallyFree ? "Free" : String(format: "€%.0f", route.price ?? 0),
-                                systemImage: route.isActuallyFree ? "gift.fill" : "tag.fill"
-                            )
-                            .font(.caption.bold())
-                            .foregroundColor(route.isActuallyFree ? .green : .orange)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(.ultraThinMaterial, in: Capsule())
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)
@@ -125,16 +115,10 @@ struct TourDetailsView: View {
                                 label: vm.myReview == nil ? "Review" : "Edit",
                                 color: .purple
                             ) { showReviewSheet = true }
-                        } else if route.isActuallyFree {
+                        } else {
                             ActionButton(icon: "bookmark", label: "Save", color: .blue) {
                                 Task { await vm.saveRoute(routeID: route.id) }
                             }
-                        } else {
-                            ActionButton(
-                                icon: "creditcard",
-                                label: String(format: "Buy €%.0f", route.price ?? 0),
-                                color: .orange
-                            ) { }
                         }
                     }
                     .frame(maxWidth: .infinity)

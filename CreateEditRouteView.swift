@@ -15,7 +15,6 @@ struct MapView: View {
     @State private var title: String = ""
     @State private var tags: [String] = []
     @State private var newTagText: String = ""
-    @State private var priceText: String = "" // localized decimal
     @State private var thumbnailImage: UIImage?
     @State private var thumbnailURL: URL?
     @State private var stops: [Stop] = []
@@ -72,16 +71,6 @@ struct MapView: View {
                         }
                     }
                 }
-            }
-            .padding(12)
-            .background(Color(.systemGray6))
-            .cornerRadius(10)
-            .padding(.horizontal)
-
-            // Price
-            HStack(spacing: 12) {
-                TextField("Price (optional)", text: $priceText)
-                    .keyboardType(.decimalPad)
             }
             .padding(12)
             .background(Color(.systemGray6))
@@ -180,14 +169,6 @@ struct MapView: View {
         }
     }
 
-    private func parsedPrice() -> Double? {
-        let trimmed = priceText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        // Try to be locale-agnostic by replacing commas with dots
-        let normalized = trimmed.replacingOccurrences(of: ",", with: ".")
-        return Double(normalized)
-    }
-
     private func saveRoute() async {
         isSaving = true
         defer { isSaving = false }
@@ -201,7 +182,6 @@ struct MapView: View {
                 _ = try await RouteEditorService().createRoute(
                     title: currentTitle,
                     tags: tags,
-                    price: parsedPrice(),
                     thumbnailURL: thumbnailURL,
                     stops: currentStops
                 )
@@ -211,7 +191,6 @@ struct MapView: View {
                     title: currentTitle,
                     stops: currentStops,
                     tags: tags,
-                    price: parsedPrice(),
                     thumbnailURL: thumbnailURL
                 )
             }

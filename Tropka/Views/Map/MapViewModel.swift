@@ -85,18 +85,10 @@ final class MapViewModel: ObservableObject {
         }
     }
 
-    // Maps category_id from the DB categories table to the PlaceCategory enum.
-    // Adjust IDs once you confirm them in the Supabase categories table.
+    // PlaceCategory's raw value is defined to match categories.id 1:1,
+    // so no manual lookup table is needed — unknown/missing IDs fall back to .other.
     private func placeCategory(for id: Int?) -> PlaceCategory {
-        switch id {
-        case 1:  return .restaurant
-        case 2:  return .cafe
-        case 3:  return .museum
-        case 4:  return .park
-        case 5:  return .shopping
-        case 6:  return .nightlife
-        case 7:  return .historical
-        default: return .cafe
-        }
+        guard let id else { return .other }
+        return PlaceCategory(rawValue: id) ?? .other
     }
 }

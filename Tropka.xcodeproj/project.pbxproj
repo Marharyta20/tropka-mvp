@@ -16,12 +16,12 @@
 		A8ACBA2E2F0EED0900170910 /* MapboxDirections in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACBA2D2F0EED0900170910 /* MapboxDirections */; };
 		A8ACBA302F0EED0900170910 /* MapboxNavigationCore in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACBA2F2F0EED0900170910 /* MapboxNavigationCore */; };
 		A8ACBA322F0EED0900170910 /* MapboxNavigationUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACBA312F0EED0900170910 /* MapboxNavigationUIKit */; };
-		A8FF8CE22FD5ED3200361A67 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CE12FD5ED3200361A67 /* Supabase */; };
 		A8FF8CD82FD5ED3200361A67 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CD72FD5ED3200361A67 /* Auth */; };
 		A8FF8CDA2FD5ED3200361A67 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CD92FD5ED3200361A67 /* Functions */; };
 		A8FF8CDC2FD5ED3200361A67 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CDB2FD5ED3200361A67 /* PostgREST */; };
 		A8FF8CDE2FD5ED3200361A67 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CDD2FD5ED3200361A67 /* Realtime */; };
 		A8FF8CE02FD5ED3200361A67 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CDF2FD5ED3200361A67 /* Storage */; };
+		A8FF8CE22FD5ED3200361A67 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A8FF8CE12FD5ED3200361A67 /* Supabase */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -42,7 +42,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		AA11BB22CC33DD44EE55FF66 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Secrets.xcconfig; path = Secrets.xcconfig; sourceTree = SOURCE_ROOT; };
 		A87F86A12DCB4DE700462F82 /* Tropka.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tropka.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A87F86B12DCB4DE900462F82 /* TropkaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TropkaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A87F86BB2DCB4DE900462F82 /* TropkaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TropkaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -51,6 +50,7 @@
 		A8818FC52F0D641F0068B9E9 /* CreateEditRouteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateEditRouteView.swift; sourceTree = "<group>"; };
 		A8818FC72F0D641F0068B9E9 /* CreateEditRouteView 2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "CreateEditRouteView 2.swift"; sourceTree = "<group>"; };
 		A8818FC92F0D65430068B9E9 /* RouteEditorService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteEditorService.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF66 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */

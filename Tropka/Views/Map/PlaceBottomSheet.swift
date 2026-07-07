@@ -56,7 +56,7 @@ struct PlaceBottomSheet: View {
 
                 Spacer()
 
-                Label(place.category.rawValue.capitalized,
+                Label(place.category.displayName,
                       systemImage: place.category.icon)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -224,20 +224,6 @@ struct CompactRouteCard: View {
                 Text(route.title)
                     .font(.subheadline)
                     .fontWeight(.medium)
-
-                HStack {
-
-                    if route.isFree {
-                        Text("FREE")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.green)
-                    } else {
-                        Text(String(format: "€%.2f", route.price ?? 0))
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                    }
-                }
             }
 
             Spacer()

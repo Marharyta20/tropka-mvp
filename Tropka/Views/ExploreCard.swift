@@ -59,25 +59,10 @@ struct ExploreCard: View {
             .frame(height: 200)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             
-            //–– Title + price/free badge ─────────────────────────────
-            HStack(alignment: .top, spacing: 8) {
-                Text(route.title)
-                    .font(.headline)
-                    .lineLimit(2)
-                
-                Spacer(minLength: 4)
-                
-                Text(route.isActuallyFree
-                     ? "FREE"
-                     : String(format: "€%.2f", route.price ?? 0))
-                .font(.caption2).bold()
-                .padding(.vertical, 4)
-                .padding(.horizontal, 8)
-                .foregroundColor(.white)
-                .background(route.isActuallyFree ? Color.green
-                            : Color.black.opacity(0.85))
-                .clipShape(Capsule())
-            }
+            //–– Title ─────────────────────────────
+            Text(route.title)
+                .font(.headline)
+                .lineLimit(2)
             
             //–– Meta (rating • duration)
             HStack(spacing: 8) {
@@ -86,7 +71,7 @@ struct ExploreCard: View {
                     systemImage: "star.fill"
                 )
                 Label(
-                    String(format: "%.1f h", route.duration),
+                    String(format: "%.1f h", Double(route.duration) / 60.0),
                     systemImage: "clock"
                 )
             }
@@ -105,42 +90,20 @@ struct ExploreCard: View {
                 }
             }
             
-            //–– CTA + wishlist
-            HStack(spacing: 12) {
-                Button(
-                    vm.route.isActuallyFree
-                    ? (vm.isSaved ? "Saved" : "Get for free")
-                    : String(format: "Buy €%.2f", vm.route.price ?? 0)
-                ) {
-                    if vm.route.isActuallyFree {
-                        Task {
-                            await vm.save()
-                            showToast = true
-                        }
-                    } else {
-                        // TODO: payment flow
-                    }
+            //–– CTA
+            Button(vm.isSaved ? "Saved" : "Save") {
+                Task {
+                    await vm.save()
+                    showToast = true
                 }
-                .disabled(vm.route.isActuallyFree && vm.isSaved)
-                .frame(maxWidth: .infinity)
-                .font(.subheadline.bold())
-                .padding(.vertical, 12)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                Button {
-                    vm.toggleWishlist()
-                } label: {
-                    Image(systemName: vm.isWished ? "heart.fill" : "heart")
-                        .font(.title3)
-                        .padding(12)
-                }
-                .foregroundColor(vm.isWished ? .red : .gray)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .buttonStyle(.plain)
             }
+            .disabled(vm.isSaved)
+            .frame(maxWidth: .infinity)
+            .font(.subheadline.bold())
+            .padding(.vertical, 12)
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .padding()
         .background(

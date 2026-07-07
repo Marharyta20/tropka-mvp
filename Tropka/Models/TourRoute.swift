@@ -7,15 +7,11 @@ struct TourRoute: Identifiable, Equatable, Codable {
     let authorUID: String
     let title: String
     let duration: Int       // minutes
-    let isFree: Bool
-    let price: Double?
     let rating: Double
     let reviewCount: Int
     let stopsCount: Int
     let tags: [String]
     let thumbnailURL: URL?  // decoded from thumbnail_url text column
-
-    var isActuallyFree: Bool { isFree || (price ?? 0) == 0 }
 
     // MARK: Codable
 
@@ -24,8 +20,6 @@ struct TourRoute: Identifiable, Equatable, Codable {
         case authorUID   = "author_uid"
         case title
         case duration
-        case isFree      = "is_free"
-        case price
         case rating
         case reviewCount = "review_count"
         case stopsCount  = "stops_count"
@@ -39,8 +33,6 @@ struct TourRoute: Identifiable, Equatable, Codable {
         authorUID   = (try? c.decodeIfPresent(String.self, forKey: .authorUID)) ?? ""
         title       = try c.decode(String.self, forKey: .title)
         duration    = (try? c.decodeIfPresent(Int.self, forKey: .duration)) ?? 0
-        isFree      = (try? c.decodeIfPresent(Bool.self, forKey: .isFree)) ?? true
-        price       = try? c.decodeIfPresent(Double.self, forKey: .price)
         rating      = (try? c.decodeIfPresent(Double.self, forKey: .rating)) ?? 0
         reviewCount = (try? c.decodeIfPresent(Int.self, forKey: .reviewCount)) ?? 0
         stopsCount  = (try? c.decodeIfPresent(Int.self, forKey: .stopsCount)) ?? 0
@@ -55,8 +47,6 @@ struct TourRoute: Identifiable, Equatable, Codable {
         try c.encode(authorUID, forKey: .authorUID)
         try c.encode(title, forKey: .title)
         try c.encode(duration, forKey: .duration)
-        try c.encode(isFree, forKey: .isFree)
-        try c.encodeIfPresent(price, forKey: .price)
         try c.encode(rating, forKey: .rating)
         try c.encode(reviewCount, forKey: .reviewCount)
         try c.encode(stopsCount, forKey: .stopsCount)
