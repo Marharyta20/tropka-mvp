@@ -75,13 +75,16 @@ struct ProfileView: View {
             }
             .buttonStyle(.bordered)
             .frame(maxWidth: .infinity)
-            
-            Button("Share profile") {
-                // TODO: share sheet
-            }
-            .buttonStyle(.bordered)
-            .frame(maxWidth: .infinity)
+
+            ShareLink("Share profile", item: shareProfileText)
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
         }
+    }
+
+    // Plain-text invite for now — swap in a real App Store / profile URL once one exists.
+    private var shareProfileText: String {
+        "Check out my profile on Tropka! I'm @\(vm.handle) 🗺️"
     }
     
     // MARK: underline tab bar
