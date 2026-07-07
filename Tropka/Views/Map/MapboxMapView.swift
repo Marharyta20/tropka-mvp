@@ -12,7 +12,7 @@ struct MapboxMapView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> MapboxMaps.MapView {
-        let options = MapInitOptions(styleURI: .streets)
+        let options = MapInitOptions(styleURI: .standard)
         let mv = MapboxMaps.MapView(frame: .zero, mapInitOptions: options)
         mv.location.options.puckType = .puck2D()
 
@@ -70,7 +70,7 @@ struct MapboxMapView: UIViewRepresentable {
             manager.annotations = places.enumerated().map { i, place in
                 var ann = PointAnnotation(coordinate: place.coordinates)
                 ann.image = .init(image: pinImage(for: place.category), name: "pin-\(place.category.rawValue)")
-                ann.iconSize = 1.2
+                ann.iconSize = 0.9
                 ann.customData = ["placeIndex": .number(Double(i))]
                 ann.tapHandler = { [weak self] _ in
                     self?.onPinTapped?(place)
@@ -81,14 +81,14 @@ struct MapboxMapView: UIViewRepresentable {
         }
 
         private func pinImage(for category: PlaceCategory) -> UIImage {
-            let size = CGSize(width: 40, height: 40)
+            let size = CGSize(width: 28, height: 28)
             let renderer = UIGraphicsImageRenderer(size: size)
             return renderer.image { _ in
                 let rect = CGRect(origin: .zero, size: size)
-                let path = UIBezierPath(ovalIn: rect.insetBy(dx: 2, dy: 2))
+                let path = UIBezierPath(ovalIn: rect.insetBy(dx: 1.5, dy: 1.5))
                 category.color.setFill()
                 path.fill()
-                let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+                let config = UIImage.SymbolConfiguration(pointSize: 13, weight: .medium)
                 if let icon = UIImage(systemName: category.icon, withConfiguration: config)?.withTintColor(.white, renderingMode: .alwaysOriginal) {
                     let iconRect = CGRect(x: (size.width - icon.size.width) / 2,
                                           y: (size.height - icon.size.height) / 2,
@@ -129,4 +129,3 @@ struct MapboxMapView: UIViewRepresentable {
         }
     }
 }
-

@@ -1,4 +1,5 @@
 import SwiftUI
+import SDWebImageSwiftUI
 
 /// Bottom sheet with details for the selected place.
 struct PlaceBottomSheet: View {
@@ -74,12 +75,14 @@ struct PlaceBottomSheet: View {
                         .foregroundColor(.secondary)
                 }
 
-                Text("•")
-                    .foregroundColor(.secondary)
+                if let isOpen = place.isOpenNow {
+                    Text("•")
+                        .foregroundColor(.secondary)
 
-                Text(place.isOpenNow ? "Open Now" : "Closed")
-                    .font(.subheadline)
-                    .foregroundColor(place.isOpenNow ? .green : .red)
+                    Text(isOpen ? "Open Now" : "Closed")
+                        .font(.subheadline)
+                        .foregroundColor(isOpen ? .green : .red)
+                }
 
                 if let distance = place.distanceFromUser {
                     Text("•")
@@ -94,19 +97,42 @@ struct PlaceBottomSheet: View {
         }
     }
 
+    // Single real photo for the place, decoded at a capped pixel size so we're not
+    // pulling a full-resolution Google-photo-sized image into memory for a small card.
+    @ViewBuilder
+    private func placePhoto(for place: Place) -> some View {
+        Group {
+            if let url = place.photoURL {
+                WebImage(
+                    url: url,
+                    context: [.imageThumbnailPixelSize: CGSize(width: 600, height: 400)]
+                ) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .overlay(ProgressView())
+                }
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .overlay(
+                        Image(systemName: "photo")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                    )
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 180)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
     private func expandedContent(for place: Place) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(0..<3) { _ in
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.gray.opacity(0.2))
-                                .frame(width: 200, height: 150)
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
+                placePhoto(for: place)
+                    .padding(.horizontal, 20)
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {

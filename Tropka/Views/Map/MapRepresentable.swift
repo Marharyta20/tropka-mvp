@@ -10,7 +10,7 @@ struct MapRepresentable: UIViewRepresentable {
     let stops: [Stop]
     let routeCoords: [CLLocationCoordinate2D]
     var selectedStopIndex: Int = 0
-    
+
     // MARK: - Coordinator
     class Coordinator {
         var parent: MapRepresentable
@@ -23,18 +23,59 @@ struct MapRepresentable: UIViewRepresentable {
         init(_ parent: MapRepresentable) {
             self.parent = parent
         }
-        
+
         // MARK: - Custom numbered pin image
-        func numberedPinImage(number: Int, isFirst: Bool, isLast: Bool,
+        // Draws a numbered circle with a pointer tail anchored to the exact
+        // coordinate (same geometry as before) plus a small name-tag pill
+        // above it. Baking the name into the bitmap avoids it colliding with
+        // the basemap's own street/place labels, which a separate Mapbox
+        // text symbol would be prone to.
+        func numberedPinImage(number: Int, name: String, isFirst: Bool, isLast: Bool,
                               isSelected: Bool = false) -> UIImage {
-            let baseSize: CGFloat = isSelected ? 44 : 36
-            let circleSize: CGFloat = isSelected ? 38 : 30
-            let tailH: CGFloat = isSelected ? 52 : 44
-            let size = CGSize(width: baseSize, height: tailH)
+            let baseSize: CGFloat = isSelected ? 33 : 27
+            let circleSize: CGFloat = isSelected ? 28 : 22
+            let tailH: CGFloat = isSelected ? 39 : 33 // height of circle+tail region only
+            let circleTopMargin: CGFloat = 4
+
+            let labelFont = UIFont.systemFont(ofSize: 10, weight: .semibold)
+            let labelAttrs: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: UIColor.label]
+            let displayName = name.count > 16 ? String(name.prefix(15)) + "…" : name
+            let displayNameNS = displayName as NSString
+            let textSize = displayNameNS.size(withAttributes: labelAttrs)
+            let labelHPadding: CGFloat = 8
+            let labelHeight: CGFloat = 16
+            let labelWidth = textSize.width + labelHPadding * 2
+            let labelSpacing: CGFloat = 3
+
+            let totalWidth = max(baseSize, labelWidth)
+            let totalHeight = labelHeight + labelSpacing + tailH
+            let size = CGSize(width: totalWidth, height: totalHeight)
+
             let renderer = UIGraphicsImageRenderer(size: size)
             return renderer.image { ctx in
-                let cx = (baseSize - circleSize) / 2
-                let circleRect = CGRect(x: cx, y: cx / 2, width: circleSize, height: circleSize)
+                // --- Name tag pill (top) ---
+                let labelRect = CGRect(x: (totalWidth - labelWidth) / 2, y: 0,
+                                       width: labelWidth, height: labelHeight)
+                let labelPath = UIBezierPath(roundedRect: labelRect, cornerRadius: labelHeight / 2)
+
+                ctx.cgContext.setShadow(offset: CGSize(width: 0, height: 1), blur: 2,
+                                        color: UIColor.black.withAlphaComponent(0.25).cgColor)
+                UIColor.systemBackground.setFill()
+                labelPath.fill()
+                ctx.cgContext.setShadow(offset: .zero, blur: 0, color: nil)
+                UIColor.separator.setStroke()
+                ctx.cgContext.setLineWidth(0.5)
+                labelPath.stroke()
+
+                let textOrigin = CGPoint(x: labelRect.midX - textSize.width / 2,
+                                         y: labelRect.midY - textSize.height / 2)
+                displayNameNS.draw(at: textOrigin, withAttributes: labelAttrs)
+
+                // --- Circle + tail (below the label) ---
+                let yOffset = labelHeight + labelSpacing
+                let cx = (totalWidth - circleSize) / 2
+                let circleRect = CGRect(x: cx, y: yOffset + circleTopMargin,
+                                        width: circleSize, height: circleSize)
 
                 let fillColor: UIColor = isFirst ? .systemGreen
                                        : isLast  ? .systemRed
@@ -42,16 +83,16 @@ struct MapRepresentable: UIViewRepresentable {
 
                 // Outer glow ring for selected
                 if isSelected {
-                    ctx.cgContext.setShadow(offset: .zero, blur: 8,
+                    ctx.cgContext.setShadow(offset: .zero, blur: 6,
                                            color: fillColor.withAlphaComponent(0.6).cgColor)
                     fillColor.withAlphaComponent(0.25).setFill()
-                    ctx.cgContext.fillEllipse(in: circleRect.insetBy(dx: -5, dy: -5))
+                    ctx.cgContext.fillEllipse(in: circleRect.insetBy(dx: -4, dy: -4))
                     ctx.cgContext.setShadow(offset: .zero, blur: 0, color: nil)
                 }
 
                 // Shadow
-                ctx.cgContext.setShadow(offset: CGSize(width: 0, height: 2),
-                                        blur: 4,
+                ctx.cgContext.setShadow(offset: CGSize(width: 0, height: 1.5),
+                                        blur: 3,
                                         color: UIColor.black.withAlphaComponent(0.35).cgColor)
                 fillColor.setFill()
                 ctx.cgContext.fillEllipse(in: circleRect)
@@ -59,31 +100,31 @@ struct MapRepresentable: UIViewRepresentable {
                 // White border
                 ctx.cgContext.setShadow(offset: .zero, blur: 0, color: nil)
                 UIColor.white.setStroke()
-                ctx.cgContext.setLineWidth(isSelected ? 3 : 2)
+                ctx.cgContext.setLineWidth(isSelected ? 2.5 : 1.5)
                 ctx.cgContext.strokeEllipse(in: circleRect.insetBy(dx: 1, dy: 1))
 
-                // Triangle tail
+                // Triangle tail — its tip is the exact anchored coordinate
                 let tailPath = UIBezierPath()
-                let midX = baseSize / 2
+                let midX = totalWidth / 2
                 let circleBottom = circleRect.maxY
-                tailPath.move(to: CGPoint(x: midX - 6, y: circleBottom - 2))
-                tailPath.addLine(to: CGPoint(x: midX + 6, y: circleBottom - 2))
-                tailPath.addLine(to: CGPoint(x: midX, y: tailH - 1))
+                tailPath.move(to: CGPoint(x: midX - 4.5, y: circleBottom - 2))
+                tailPath.addLine(to: CGPoint(x: midX + 4.5, y: circleBottom - 2))
+                tailPath.addLine(to: CGPoint(x: midX, y: totalHeight - 1))
                 tailPath.close()
                 fillColor.setFill()
                 tailPath.fill()
 
                 // Number
                 let text = "\(number)" as NSString
-                let fontSize: CGFloat = isSelected ? 17 : 14
+                let fontSize: CGFloat = isSelected ? 13 : 11
                 let font = UIFont.systemFont(ofSize: fontSize, weight: .bold)
                 let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.white]
-                let textSize = text.size(withAttributes: attrs)
-                let textRect = CGRect(
-                    x: circleRect.midX - textSize.width / 2,
-                    y: circleRect.midY - textSize.height / 2,
-                    width: textSize.width, height: textSize.height)
-                text.draw(in: textRect, withAttributes: attrs)
+                let numberSize = text.size(withAttributes: attrs)
+                let numberRect = CGRect(
+                    x: circleRect.midX - numberSize.width / 2,
+                    y: circleRect.midY - numberSize.height / 2,
+                    width: numberSize.width, height: numberSize.height)
+                text.draw(in: numberRect, withAttributes: attrs)
             }
         }
 
@@ -111,7 +152,7 @@ struct MapRepresentable: UIViewRepresentable {
             guard let pointManager = pointManager,
                   let polylineManager = polylineManager else { return }
 
-            // --- PINS with custom numbered images ---
+            // --- PINS with custom numbered images (name baked in above the pin) ---
             let totalStops = parent.stops.count
             let selectedIdx = parent.selectedStopIndex
             let points: [PointAnnotation] = parent.stops.enumerated().map { index, stop in
@@ -119,6 +160,7 @@ struct MapRepresentable: UIViewRepresentable {
                 let isLast     = index == totalStops - 1
                 let isSelected = index == selectedIdx
                 let pinImage   = numberedPinImage(number: index + 1,
+                                                  name: stop.name,
                                                   isFirst: isFirst,
                                                   isLast: isLast,
                                                   isSelected: isSelected)
@@ -129,29 +171,27 @@ struct MapRepresentable: UIViewRepresentable {
                 annotation.iconImage = imageID
                 annotation.iconAnchor = .bottom
                 annotation.iconSize = 1.0
-                // Show stop name label below pin
-                annotation.textField = stop.name
-                annotation.textAnchor = .top
-                annotation.textOffset = [0, 0.5]
-                annotation.textSize = 11
-                annotation.textColor = StyleColor(.black)
-                annotation.textHaloColor = StyleColor(.white)
-                annotation.textHaloWidth = 2
                 return annotation
             }
             pointManager.annotations = points
 
-            // --- ROUTE LINE ---
+            // --- ROUTE LINE (white casing underneath for legibility over any basemap) ---
             let lineCoords = !parent.routeCoords.isEmpty
                 ? parent.routeCoords
                 : parent.stops.map { $0.location }
 
             if lineCoords.count > 1 {
+                var casing = PolylineAnnotation(lineCoordinates: lineCoords)
+                casing.lineColor = StyleColor(UIColor.white)
+                casing.lineWidth = 8.0
+                casing.lineOpacity = 0.9
+
                 var polyline = PolylineAnnotation(lineCoordinates: lineCoords)
                 polyline.lineColor = StyleColor(UIColor.systemBlue)
                 polyline.lineWidth = 5.0
-                polyline.lineOpacity = 0.9
-                polylineManager.annotations = [polyline]
+                polyline.lineOpacity = 0.95
+
+                polylineManager.annotations = [casing, polyline]
             } else {
                 polylineManager.annotations = []
             }
@@ -171,14 +211,14 @@ struct MapRepresentable: UIViewRepresentable {
             }
         }
     }
-    
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     // MARK: - Make UIView
     func makeUIView(context: Context) -> MapboxMaps.MapView {
-        let myMapInitOptions = MapInitOptions(styleURI: .outdoors)
+        let myMapInitOptions = MapInitOptions(styleURI: .standard)
         let mapView = MapboxMaps.MapView(frame: .zero, mapInitOptions: myMapInitOptions)
 
         mapView.ornaments.scaleBarView.isHidden = true
@@ -261,4 +301,3 @@ struct MapRepresentable: UIViewRepresentable {
         }
     }
 }
-

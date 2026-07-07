@@ -52,6 +52,7 @@ final class MapViewModel: ObservableObject {
             let tags: [String]?
             let photoUrl: String?
             let categoryId: Int?
+            let openingHours: String?
 
             enum CodingKeys: String, CodingKey {
                 case id, name, lat, lng, tags
@@ -59,12 +60,13 @@ final class MapViewModel: ObservableObject {
                 case ratingReviews = "rating_reviews"
                 case photoUrl      = "photo_url"
                 case categoryId    = "category_id"
+                case openingHours  = "opening_hours"
             }
         }
 
         let rows: [PlaceRow] = try await supabase
             .from("places")
-            .select("id, name, lat, lng, rating_score, rating_reviews, tags, photo_url, category_id")
+            .select("id, name, lat, lng, rating_score, rating_reviews, tags, photo_url, category_id, opening_hours")
             .limit(300)
             .execute()
             .value
@@ -78,7 +80,7 @@ final class MapViewModel: ObservableObject {
                 coordinates: CLLocationCoordinate2D(latitude: lat, longitude: lng),
                 rating: row.ratingScore ?? 0,
                 reviewCount: row.ratingReviews ?? 0,
-                isOpenNow: true,
+                isOpenNow: OpeningHoursParser.isOpenNow(jsonString: row.openingHours),
                 tags: row.tags ?? [],
                 photoURL: row.photoUrl.flatMap(URL.init)
             )

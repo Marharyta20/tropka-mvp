@@ -104,7 +104,8 @@ struct Place: Identifiable {
     let coordinates: CLLocationCoordinate2D
     let rating: Double
     let reviewCount: Int
-    let isOpenNow: Bool
+    /// nil when we couldn't determine today's status from opening_hours (missing/malformed data)
+    let isOpenNow: Bool?
     let tags: [String]
     let photoURL: URL?
 
