@@ -18,14 +18,6 @@ struct TourDetailsView: View {
         return fromStops > 0 ? fromStops : route.duration
     }
 
-    private func formatDuration(_ minutes: Int) -> String {
-        guard minutes > 0 else { return "—" }
-        if minutes < 60 { return "\(minutes) min" }
-        let h = minutes / 60
-        let m = minutes % 60
-        return m == 0 ? "\(h)h" : "\(h)h \(m)m"
-    }
-
     var body: some View {
         ZStack(alignment: .topLeading) {
             // ── Main scrollable content ──────────────────────────────
@@ -70,7 +62,7 @@ struct TourDetailsView: View {
                     HStack(spacing: 0) {
                         StatPill(icon: "star.fill",  value: String(format: "%.1f", route.rating), color: .yellow)
                         Divider().frame(height: 24)
-                        StatPill(icon: "clock",      value: formatDuration(totalMinutes),          color: .blue)
+                        StatPill(icon: "clock",      value: totalMinutes.formattedDuration,          color: .blue)
                         Divider().frame(height: 24)
                         StatPill(icon: "mappin",     value: "\(route.stopsCount) stops",           color: .red)
                     }

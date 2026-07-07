@@ -71,7 +71,7 @@ struct ExploreCard: View {
                     systemImage: "star.fill"
                 )
                 Label(
-                    String(format: "%.1f h", Double(route.duration) / 60.0),
+                    route.duration.formattedDuration,
                     systemImage: "clock"
                 )
             }
