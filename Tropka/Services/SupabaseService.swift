@@ -13,23 +13,38 @@ final class SupabaseService {
 
     // MARK: - Routes
 
+    /// Explore feed. The status filter is a UI nicety — row level security already
+    /// hides other people's drafts and private routes, but without it the author
+    /// would see their own unpublished ones mixed into the public feed.
     func fetchRoutes() async throws -> [TourRoute] {
         try await supabase
             .from("routes")
             .select(Self.routeColumns)
+            .eq("status", value: RouteStatus.public.rawValue)
             .order("created_at", ascending: false)
             .limit(50)
             .execute()
             .value
     }
 
-    /// Routes written by one user — powers the "Created" tab in the profile.
+    /// Routes written by one user, every status — powers the "Created" tab.
     func fetchRoutes(authoredBy uid: String) async throws -> [TourRoute] {
         try await supabase
             .from("routes")
             .select(Self.routeColumns)
             .eq("author_uid", value: uid)
             .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    /// Single route, used to refresh a detail screen after an edit.
+    func fetchRoute(id: String) async throws -> TourRoute {
+        try await supabase
+            .from("routes")
+            .select(Self.routeColumns)
+            .eq("id", value: id)
+            .single()
             .execute()
             .value
     }

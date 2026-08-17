@@ -122,6 +122,7 @@ extension Analytics {
         case routeCreated       = "route_created"
         case routeUpdated       = "route_updated"
         case routeDeleted       = "route_deleted"
+        case routeStatusChanged = "route_status_changed"
         case routeStopAdded     = "route_stop_added"
         case routeStopAppended  = "route_stop_appended"
         case placeAddedToDraft  = "place_added_to_draft"

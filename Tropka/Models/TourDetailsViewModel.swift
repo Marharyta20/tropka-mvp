@@ -7,6 +7,9 @@ import MapboxNavigationCore
 @MainActor
 final class TourDetailsViewModel: ObservableObject {
     @Published var stops: [Stop] = []
+    /// Refreshed copy of the route header. The view is handed an immutable
+    /// TourRoute, so after an edit or a status change we re-read it here.
+    @Published var route: TourRoute?
     @Published var isLoading = false
     @Published var errorMsg: String? = nil
 
@@ -25,6 +28,8 @@ final class TourDetailsViewModel: ObservableObject {
     func load(routeID: String) async {
         isLoading = true
         errorMsg = nil
+
+        await reloadRoute(routeID: routeID)
 
         async let savedTask = saveSvc.isSaved(routeID: routeID)
         async let reviewTask = fetchMyReview(routeID: routeID)
@@ -45,6 +50,20 @@ final class TourDetailsViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    func reloadRoute(routeID: String) async {
+        route = try? await SupabaseService.shared.fetchRoute(id: routeID)
+    }
+
+    func setStatus(routeID: String, status: RouteStatus) async {
+        do {
+            try await RouteEditorService().setStatus(routeID: routeID, status: status)
+            await reloadRoute(routeID: routeID)
+            Analytics.track(.routeStatusChanged, ["route_id": routeID, "status": status.rawValue])
+        } catch {
+            errorMsg = error.localizedDescription
+        }
     }
 
     func saveRoute(routeID: String) async {

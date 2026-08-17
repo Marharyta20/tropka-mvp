@@ -218,16 +218,17 @@ struct ProfileView: View {
             List {
                 ForEach(vm.createdRoutes) { route in
                     NavigationLink {
-                        RouteEditorView(mode: .edit(routeID: route.id)) {
-                            Task { await vm.fetchCreatedRoutes() }
-                        }
+                        TourDetailsView(route: route, source: .profile)
                     } label: {
                         CreatedRouteCell(route: route)
                     }
                     .simultaneousGesture(TapGesture().onEnded {
-                        Analytics.track(.routeEditorOpened, [
-                            "mode": "edit",
-                            "route_id": route.id
+                        Analytics.track(.routeOpened, [
+                            "route_id": route.id,
+                            "route_title": route.title,
+                            "status": route.status.rawValue,
+                            "source": Analytics.Source.profile.rawValue,
+                            "is_own": true
                         ])
                     })
                     .swipeActions {
@@ -261,6 +262,7 @@ struct ProfileView: View {
             Button("Cancel", role: .cancel) { pendingCreatedDelete = nil }
         }
         .task { await vm.fetchCreatedRoutes() }
+        .refreshable { await vm.fetchCreatedRoutes() }
     }
 
     // MARK: – Reviews list
@@ -476,6 +478,7 @@ private struct CreatedRouteCell: View {
                 Text("\(route.stopsCount) stops · \(route.duration.formattedDuration)")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                RouteStatusBadge(status: route.status)
             }
 
             Spacer()

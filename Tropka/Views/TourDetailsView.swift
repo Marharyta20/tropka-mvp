@@ -13,6 +13,12 @@ struct TourDetailsView: View {
 
     @State private var showMap         = false
     @State private var showReviewSheet = false
+    @State private var showEditor      = false
+
+    /// The route as last read from the database, falling back to what we were
+    /// handed. Editing or publishing refreshes vm.route, and the header follows.
+    private var shown: TourRoute { vm.route ?? route }
+    private var isAuthor: Bool { shown.isMine }
 
     // Compute duration: prefer sum of stops, else route.duration
     private var totalMinutes: Int {
@@ -56,13 +62,20 @@ struct TourDetailsView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                            if let author = route.authorName {
-                                Label("by \(author)", systemImage: "person.circle")
-                                    .font(.subheadline)
-                                    .foregroundColor(.white.opacity(0.9))
-                                    .shadow(radius: 2)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            HStack(spacing: 8) {
+                                if let author = shown.authorName {
+                                    Label("by \(author)", systemImage: "person.circle")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.9))
+                                        .shadow(radius: 2)
+                                }
+                                // Only the author can see a non-public route at all,
+                                // so the badge never leaks anything.
+                                if shown.status != .public {
+                                    RouteStatusBadge(status: shown.status)
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)
@@ -135,7 +148,7 @@ struct TourDetailsView: View {
                                 ])
                                 showReviewSheet = true
                             }
-                        } else {
+                        } else if !isAuthor {
                             ActionButton(icon: "bookmark", label: "Save", color: .blue) {
                                 Analytics.track(.routeSaved, [
                                     "route_id": route.id,
@@ -143,6 +156,43 @@ struct TourDetailsView: View {
                                     "source": "route_details"
                                 ])
                                 Task { await vm.saveRoute(routeID: route.id) }
+                            }
+                        }
+
+                        // The author gets editing controls instead of a Save button —
+                        // saving your own route to your own saved list makes no sense.
+                        if isAuthor {
+                            Divider().frame(height: 36)
+                            ActionButton(icon: "slider.horizontal.3", label: "Edit", color: .blue) {
+                                Analytics.track(.routeEditorOpened, [
+                                    "mode": "edit",
+                                    "route_id": route.id,
+                                    "source": "route_details"
+                                ])
+                                showEditor = true
+                            }
+                            Divider().frame(height: 36)
+                            Menu {
+                                Picker("Visibility", selection: Binding(
+                                    get: { shown.status },
+                                    set: { newValue in
+                                        Task { await vm.setStatus(routeID: route.id, status: newValue) }
+                                    }
+                                )) {
+                                    ForEach(RouteStatus.allCases) { option in
+                                        Label(option.title, systemImage: option.icon).tag(option)
+                                    }
+                                }
+                            } label: {
+                                VStack(spacing: 4) {
+                                    Image(systemName: shown.status.icon)
+                                        .font(.system(size: 20, weight: .medium))
+                                    Text(shown.status.title)
+                                        .font(.caption.bold())
+                                }
+                                .foregroundColor(shown.status.tint)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
                             }
                         }
                     }
@@ -224,6 +274,11 @@ struct TourDetailsView: View {
         }
         .navigationDestination(isPresented: $showMap) {
             RouteMapView(vm: vm)
+        }
+        .navigationDestination(isPresented: $showEditor) {
+            RouteEditorView(mode: .edit(routeID: route.id)) {
+                Task { await vm.load(routeID: route.id) }
+            }
         }
     }
 }

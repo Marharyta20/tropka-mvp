@@ -96,9 +96,12 @@ class ProfileViewModel: ObservableObject {
     func fetchSavedRoutes() async {
         guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
 
+        // `routes` is optional on purpose: if an author flips their route to
+        // private or draft, row level security stops returning it and the embed
+        // comes back null. Without this the whole saved list would fail to decode.
         struct SavedRouteRow: Decodable {
             let savedAt: Date?
-            let routes: TourRoute
+            let routes: TourRoute?
             enum CodingKeys: String, CodingKey {
                 case savedAt = "saved_at"
                 case routes
@@ -114,7 +117,10 @@ class ProfileViewModel: ObservableObject {
                 .execute()
                 .value
 
-            routes = rows.map { SavedRoute(route: $0.routes, savedAt: $0.savedAt) }
+            routes = rows.compactMap { row in
+                guard let route = row.routes else { return nil }
+                return SavedRoute(route: route, savedAt: row.savedAt)
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

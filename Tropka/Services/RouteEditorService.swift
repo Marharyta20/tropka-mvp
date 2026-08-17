@@ -4,10 +4,13 @@ import Foundation
 
 /// Create / update / delete for routes the signed-in user authors.
 ///
-/// Two things the database takes care of, so this service never writes them:
+/// Three things the database takes care of, so this service never writes them:
 ///   • `routes.duration` — recomputed by the route_stops_sync_route_duration trigger
 ///   • `routes.rating` / `review_count` — recomputed by reviews_sync_route_rating
 /// Sending them from here would clobber real ratings on every edit.
+///
+/// `stops_count` is the exception: it has no trigger, so every path that changes
+/// the number of stops must keep it in sync by hand.
 struct RouteEditorService {
 
     private var currentUID: String? { supabase.auth.currentUser?.id.uuidString }
@@ -17,13 +20,14 @@ struct RouteEditorService {
     private struct RouteInsert: Encodable {
         let authorUid: String
         let title: String
+        let status: RouteStatus
         let tags: [String]
         let thumbnailUrl: String?
         let stopsCount: Int
 
         enum CodingKeys: String, CodingKey {
             case authorUid    = "author_uid"
-            case title, tags
+            case title, status, tags
             case thumbnailUrl = "thumbnail_url"
             case stopsCount   = "stops_count"
         }
@@ -31,15 +35,20 @@ struct RouteEditorService {
 
     private struct RouteUpdate: Encodable {
         let title: String
+        let status: RouteStatus
         let tags: [String]
         let thumbnailUrl: String?
         let stopsCount: Int
 
         enum CodingKeys: String, CodingKey {
-            case title, tags
+            case title, status, tags
             case thumbnailUrl = "thumbnail_url"
             case stopsCount   = "stops_count"
         }
+    }
+
+    private struct StatusUpdate: Encodable {
+        let status: RouteStatus
     }
 
     private struct RouteStopInsert: Encodable {
@@ -64,6 +73,7 @@ struct RouteEditorService {
     // MARK: - Create
 
     func createRoute(title: String,
+                     status: RouteStatus,
                      tags: [String],
                      thumbnailURL: URL?,
                      stops: [DraftStop]) async throws -> String {
@@ -72,6 +82,7 @@ struct RouteEditorService {
         let row = RouteInsert(
             authorUid: uid,
             title: title,
+            status: status,
             tags: tags,
             thumbnailUrl: thumbnailURL?.absoluteString,
             stopsCount: stops.count
@@ -94,11 +105,13 @@ struct RouteEditorService {
 
     func updateRoute(routeID: String,
                      title: String,
+                     status: RouteStatus,
                      tags: [String],
                      thumbnailURL: URL?,
                      stops: [DraftStop]) async throws {
         let row = RouteUpdate(
             title: title,
+            status: status,
             tags: tags,
             thumbnailUrl: thumbnailURL?.absoluteString,
             stopsCount: stops.count
@@ -114,14 +127,20 @@ struct RouteEditorService {
         try await replaceStops(routeID: routeID, stops: stops)
     }
 
+    /// Publish / unpublish without opening the editor.
+    func setStatus(routeID: String, status: RouteStatus) async throws {
+        try await supabase
+            .from("routes")
+            .update(StatusUpdate(status: status))
+            .eq("id", value: routeID)
+            .execute()
+    }
+
     // MARK: - Append a single stop
 
     /// Adds one place to the end of an existing route.
     /// Returns false when that place is already a stop, so the caller can say so
     /// instead of silently creating a duplicate.
-    ///
-    /// `stops_count` has no database trigger behind it (unlike duration and rating),
-    /// so it is kept in sync here by hand.
     @discardableResult
     func appendStop(to routeID: String,
                     placeID: Int,
@@ -179,7 +198,7 @@ struct RouteEditorService {
     // MARK: - Fetch (for the edit screen)
 
     func fetchForEditing(routeID: String) async throws
-    -> (title: String, tags: [String], thumbnailURL: URL?, stops: [DraftStop]) {
+    -> (title: String, status: RouteStatus, tags: [String], thumbnailURL: URL?, stops: [DraftStop]) {
         let route: TourRoute = try await supabase
             .from("routes")
             .select()
@@ -189,7 +208,7 @@ struct RouteEditorService {
             .value
 
         let saved = try await SupabaseService.shared.fetchStops(for: routeID)
-        return (route.title, route.tags, route.thumbnailURL, saved.map(DraftStop.init(stop:)))
+        return (route.title, route.status, route.tags, route.thumbnailURL, saved.map(DraftStop.init(stop:)))
     }
 
     // MARK: - Helpers

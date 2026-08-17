@@ -9,12 +9,19 @@ struct TourRoute: Identifiable, Equatable, Codable {
     /// nil when the query did not ask for `users(...)`.
     let authorName: String?
     let title: String
+    let status: RouteStatus
     let duration: Int       // minutes
     let rating: Double
     let reviewCount: Int
     let stopsCount: Int
     let tags: [String]
     let thumbnailURL: URL?  // decoded from thumbnail_url text column
+
+    /// True when the signed-in user wrote this route.
+    var isMine: Bool {
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return false }
+        return authorUID.caseInsensitiveCompare(uid) == .orderedSame
+    }
 
     // MARK: Codable
 
@@ -34,6 +41,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         case authorUID   = "author_uid"
         case author      = "users"
         case title
+        case status
         case duration
         case rating
         case reviewCount = "review_count"
@@ -47,6 +55,8 @@ struct TourRoute: Identifiable, Equatable, Codable {
         id          = try c.decode(String.self, forKey: .id)
         authorUID   = (try? c.decodeIfPresent(String.self, forKey: .authorUID)) ?? ""
         title       = try c.decode(String.self, forKey: .title)
+        // Older queries that don't select status still decode; treat them as public.
+        status      = (try? c.decodeIfPresent(RouteStatus.self, forKey: .status)) ?? .public
         duration    = (try? c.decodeIfPresent(Int.self, forKey: .duration)) ?? 0
         rating      = (try? c.decodeIfPresent(Double.self, forKey: .rating)) ?? 0
         reviewCount = (try? c.decodeIfPresent(Int.self, forKey: .reviewCount)) ?? 0
@@ -69,6 +79,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         try c.encode(id, forKey: .id)
         try c.encode(authorUID, forKey: .authorUID)
         try c.encode(title, forKey: .title)
+        try c.encode(status, forKey: .status)
         try c.encode(duration, forKey: .duration)
         try c.encode(rating, forKey: .rating)
         try c.encode(reviewCount, forKey: .reviewCount)
@@ -78,5 +89,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         // authorName is derived from a join, never written back.
     }
 
-    static func == (lhs: TourRoute, rhs: TourRoute) -> Bool { lhs.id == rhs.id }
+    static func == (lhs: TourRoute, rhs: TourRoute) -> Bool {
+        lhs.id == rhs.id && lhs.status == rhs.status && lhs.title == rhs.title
+    }
 }

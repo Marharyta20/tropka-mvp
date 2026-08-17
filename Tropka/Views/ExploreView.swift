@@ -6,6 +6,7 @@ struct ExploreView: View {
     @State private var searchText = ""
     @State private var selectedTag: String?
     @State private var searchDebounce: Task<Void, Never>?
+    @State private var showNewRoute = false
 
     // Filtered list
     var filteredRoutes: [TourRoute] {
@@ -131,6 +132,25 @@ struct ExploreView: View {
                 .animation(.default, value: filteredRoutes)
             }
             .navigationTitle("Explore")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Analytics.track(.routeEditorOpened, [
+                            "mode": "create",
+                            "source": Analytics.Source.explore.rawValue,
+                            "draft_size": RouteDraftStore.shared.count
+                        ])
+                        showNewRoute = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .navigationDestination(isPresented: $showNewRoute) {
+                RouteEditorView(mode: .create) {
+                    vm.loadRoutes()
+                }
+            }
         }
         .trackScreen("Explore")
         .onAppear {

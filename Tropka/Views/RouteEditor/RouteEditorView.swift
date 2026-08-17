@@ -32,6 +32,7 @@ struct RouteEditorView: View {
     @StateObject private var draftStore = RouteDraftStore.shared
 
     @State private var title = ""
+    @State private var status: RouteStatus = .draft
     @State private var tags: [String] = []
     @State private var newTag = ""
     @State private var stops: [DraftStop] = []
@@ -59,6 +60,7 @@ struct RouteEditorView: View {
     var body: some View {
         Form {
             detailsSection
+            visibilitySection
             coverSection
             stopsSection
         }
@@ -143,6 +145,21 @@ struct RouteEditorView: View {
                     .padding(.vertical, 2)
                 }
             }
+        }
+    }
+
+    private var visibilitySection: some View {
+        Section {
+            Picker("Visibility", selection: $status) {
+                ForEach(RouteStatus.allCases) { option in
+                    Label(option.title, systemImage: option.icon).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+        } header: {
+            Text("Visibility")
+        } footer: {
+            Text(status.explanation)
         }
     }
 
@@ -254,6 +271,7 @@ struct RouteEditorView: View {
             do {
                 let loaded = try await RouteEditorService().fetchForEditing(routeID: routeID)
                 title = loaded.title
+                status = loaded.status
                 tags = loaded.tags
                 thumbnailURL = loaded.thumbnailURL
                 stops = loaded.stops
@@ -287,12 +305,14 @@ struct RouteEditorView: View {
                 "stops_count": stops.count,
                 "total_minutes": totalMinutes,
                 "tags_count": tags.count,
-                "has_cover": thumbnailURL != nil
+                "has_cover": thumbnailURL != nil,
+                "status": status.rawValue
             ]
 
             switch mode {
             case .create:
                 let id = try await service.createRoute(title: cleanTitle,
+                                                       status: status,
                                                        tags: tags,
                                                        thumbnailURL: thumbnailURL,
                                                        stops: stops)
@@ -302,6 +322,7 @@ struct RouteEditorView: View {
             case let .edit(routeID):
                 try await service.updateRoute(routeID: routeID,
                                               title: cleanTitle,
+                                              status: status,
                                               tags: tags,
                                               thumbnailURL: thumbnailURL,
                                               stops: stops)
