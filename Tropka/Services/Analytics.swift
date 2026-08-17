@@ -132,6 +132,12 @@ extension Analytics {
         case reviewSubmitted    = "review_submitted"
         case reviewDeleted      = "review_deleted"
 
+        // Places catalogue
+        case placeOpened            = "place_opened"
+        case placesSearched         = "places_searched"
+        case placeLinkOpened        = "place_link_opened"
+        case exploreSectionSwitched = "explore_section_switched"
+
         // Map
         case mapSearched        = "map_searched"
         case mapPinTapped       = "map_pin_tapped"

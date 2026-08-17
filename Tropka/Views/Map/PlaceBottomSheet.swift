@@ -12,6 +12,7 @@ struct PlaceBottomSheet: View {
     @State private var relatedRoutes: [TourRoute] = []
     @State private var isLoadingRoutes = false
     @State private var showAddToRoute = false
+    @State private var showDetails = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -40,6 +41,15 @@ struct PlaceBottomSheet: View {
             .shadow(radius: 10)
             .offset(y: geometry.size.height - height)
             .gesture(dragGesture)
+            .sheet(isPresented: $showDetails) {
+                if let place, let placeID = Int(place.id) {
+                    // The map screen has no NavigationStack of its own, so the
+                    // detail screen brings one for its own links to work.
+                    NavigationStack {
+                        PlaceDetailView(placeID: placeID)
+                    }
+                }
+            }
             .sheet(isPresented: $showAddToRoute) {
                 if let place, let placeID = Int(place.id) {
                     AddToRoutePicker(placeID: placeID,
@@ -200,15 +210,18 @@ struct PlaceBottomSheet: View {
                 }
                 .padding(.horizontal, 20)
 
+                // The sheet is a summary; everything the catalogue knows lives on
+                // the full screen.
                 Button(action: {
-                    // No review flow for places yet, but we can measure the demand.
-                    Analytics.track(.reviewFormOpened, [
+                    Analytics.track(.placeOpened, [
                         "place_id": place.id,
-                        "target": "place",
-                        "is_edit": false
+                        "place_name": place.name,
+                        "category": place.category.displayName,
+                        "source": "map_sheet"
                     ])
+                    showDetails = true
                 }) {
-                    Text("Leave a Review")
+                    Label("More about this place", systemImage: "info.circle")
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color(.systemGray5))
