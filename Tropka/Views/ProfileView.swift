@@ -8,14 +8,18 @@ struct ProfileView: View {
     @StateObject private var vm = ProfileViewModel()
     
     @State private var showSettings  = false
-    @State private var selectedTab: Tab = .routes
+    @State private var selectedTab: Tab = .saved
     @Namespace private var underlineNS
     
     @State private var pendingDelete: SavedRoute?
     @State private var showDeleteConfirm = false
     @State private var editingReview: UserReview?
+
+    @State private var pendingCreatedDelete: TourRoute?
+    @State private var showCreatedDeleteConfirm = false
+    @State private var showNewRoute = false
     
-    enum Tab { case routes, reviews }
+    enum Tab { case saved, created, reviews }
     
     
     // MARK: body
@@ -100,9 +104,10 @@ struct ProfileView: View {
     
     // MARK: underline tab bar
     private var tabBar: some View {
-        HStack(spacing: 28) {
-            tabButton(title: "Your Routes", tab: .routes)
-            tabButton(title: "Reviews",     tab: .reviews)
+        HStack(spacing: 24) {
+            tabButton(title: "Saved",   tab: .saved)
+            tabButton(title: "Created", tab: .created)
+            tabButton(title: "Reviews", tab: .reviews)
             Spacer()
         }
     }
@@ -130,9 +135,12 @@ struct ProfileView: View {
     @ViewBuilder
     private var tabContent: some View {
         switch selectedTab {
-            
-        case .routes:
+
+        case .saved:
             routesList
+
+        case .created:
+            createdList
 
         case .reviews:
             reviewsList
@@ -187,6 +195,74 @@ struct ProfileView: View {
         }
     }
     
+    // MARK: – Created routes
+    private var createdList: some View {
+        VStack(spacing: 0) {
+            Button {
+                Analytics.track(.routeEditorOpened, [
+                    "mode": "create",
+                    "draft_size": RouteDraftStore.shared.count
+                ])
+                showNewRoute = true
+            } label: {
+                Label(RouteDraftStore.shared.isEmpty
+                      ? "New route"
+                      : "New route (\(RouteDraftStore.shared.count) from map)",
+                      systemImage: "plus.circle.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.bottom, 8)
+
+            List {
+                ForEach(vm.createdRoutes) { route in
+                    NavigationLink {
+                        RouteEditorView(mode: .edit(routeID: route.id)) {
+                            Task { await vm.fetchCreatedRoutes() }
+                        }
+                    } label: {
+                        CreatedRouteCell(route: route)
+                    }
+                    .simultaneousGesture(TapGesture().onEnded {
+                        Analytics.track(.routeEditorOpened, [
+                            "mode": "edit",
+                            "route_id": route.id
+                        ])
+                    })
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            pendingCreatedDelete = route
+                            showCreatedDeleteConfirm = true
+                        } label: { Label("Delete", systemImage: "trash") }
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .overlay {
+                if vm.createdRoutes.isEmpty {
+                    Text("You haven't created any routes yet")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .navigationDestination(isPresented: $showNewRoute) {
+            RouteEditorView(mode: .create) {
+                Task { await vm.fetchCreatedRoutes() }
+            }
+        }
+        .confirmationDialog("Delete this route? This cannot be undone.",
+                            isPresented: $showCreatedDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                if let r = pendingCreatedDelete {
+                    Task { await vm.deleteCreated(routeID: r.id) }
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingCreatedDelete = nil }
+        }
+        .task { await vm.fetchCreatedRoutes() }
+    }
+
     // MARK: – Reviews list
     private var reviewsList: some View {
         List {
@@ -370,6 +446,48 @@ private struct ProfileRouteCell: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+    }
+}
+
+// MARK: created route cell
+private struct CreatedRouteCell: View {
+    let route: TourRoute
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                if let url = route.thumbnailURL {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let img): img.resizable().scaledToFill()
+                        default: Color(.systemGray5)
+                        }
+                    }
+                } else {
+                    Color(.systemGray5)
+                        .overlay(Image(systemName: "map").foregroundColor(.secondary))
+                }
+            }
+            .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(route.title).font(.headline).lineLimit(1)
+                Text("\(route.stopsCount) stops · \(route.duration.formattedDuration)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            if route.reviewCount > 0 {
+                HStack(spacing: 3) {
+                    Image(systemName: "star.fill").font(.caption2).foregroundColor(.yellow)
+                    Text(String(format: "%.1f", route.rating)).font(.caption)
+                }
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 

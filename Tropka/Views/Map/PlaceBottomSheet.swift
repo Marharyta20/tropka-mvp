@@ -11,6 +11,7 @@ struct PlaceBottomSheet: View {
     @State private var isDragging = false
     @State private var relatedRoutes: [TourRoute] = []
     @State private var isLoadingRoutes = false
+    @State private var showAddToRoute = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -39,6 +40,13 @@ struct PlaceBottomSheet: View {
             .shadow(radius: 10)
             .offset(y: geometry.size.height - height)
             .gesture(dragGesture)
+            .sheet(isPresented: $showAddToRoute) {
+                if let place, let placeID = Int(place.id) {
+                    AddToRoutePicker(placeID: placeID,
+                                     placeName: place.name,
+                                     placePhotoURL: place.photoURL)
+                }
+            }
             .task(id: place?.id) {
                 guard let placeID = place?.id else {
                     relatedRoutes = []
@@ -180,8 +188,20 @@ struct PlaceBottomSheet: View {
                     }
                 }
 
+                // Lets the user choose between starting a new route and appending
+                // to one they already wrote.
+                Button(action: { showAddToRoute = true }) {
+                    Label("Add to route", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal, 20)
+
                 Button(action: {
-                    // Same here: no review flow for places yet, but we can measure the demand.
+                    // No review flow for places yet, but we can measure the demand.
                     Analytics.track(.reviewFormOpened, [
                         "place_id": place.id,
                         "target": "place",
@@ -191,8 +211,8 @@ struct PlaceBottomSheet: View {
                     Text("Leave a Review")
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
+                        .background(Color(.systemGray5))
+                        .foregroundColor(.primary)
                         .cornerRadius(12)
                 }
                 .padding(.horizontal, 20)

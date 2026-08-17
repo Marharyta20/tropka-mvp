@@ -48,13 +48,21 @@ struct TourDetailsView: View {
                         .frame(height: 280)
 
                         // Title overlaid at bottom
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(route.title)
                                 .font(.title2.bold())
                                 .foregroundColor(.white)
                                 .shadow(radius: 2)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                            if let author = route.authorName {
+                                Label("by \(author)", systemImage: "person.circle")
+                                    .font(.subheadline)
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .shadow(radius: 2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)

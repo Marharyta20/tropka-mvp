@@ -20,8 +20,11 @@ class ProfileViewModel: ObservableObject {
     @Published var city        = ""
     @Published var registrationDate: Date?
 
-    // Saved routes
+    // Routes saved from other authors
     @Published var routes: [SavedRoute] = []
+
+    // Routes this user wrote
+    @Published var createdRoutes: [TourRoute] = []
 
     // Reviews
     @Published var myReviews: [UserReview] = []
@@ -46,6 +49,7 @@ class ProfileViewModel: ObservableObject {
     func fetchAll() async {
         await fetchUserProfile()
         await fetchSavedRoutes()
+        await fetchCreatedRoutes()
         loadReviews()
     }
 
@@ -104,7 +108,7 @@ class ProfileViewModel: ObservableObject {
         do {
             let rows: [SavedRouteRow] = try await supabase
                 .from("saved_routes")
-                .select("saved_at, routes(*)")
+                .select("saved_at, routes(*, users(full_name, username))")
                 .eq("user_id", value: uid)
                 .order("saved_at", ascending: false)
                 .execute()
@@ -121,6 +125,27 @@ class ProfileViewModel: ObservableObject {
             routes.remove(at: idx)
         }
         try? await SavedRoutesService().remove(routeID: routeID)
+    }
+
+    // MARK: - Created routes
+
+    func fetchCreatedRoutes() async {
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
+        do {
+            createdRoutes = try await SupabaseService.shared.fetchRoutes(authoredBy: uid)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteCreated(routeID: String) async {
+        do {
+            try await RouteEditorService().deleteRoute(routeID: routeID)
+            createdRoutes.removeAll { $0.id == routeID }
+            Analytics.track(.routeDeleted, ["route_id": routeID])
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     // MARK: - Reviews

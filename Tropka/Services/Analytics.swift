@@ -117,6 +117,15 @@ extension Analytics {
         case routeStopOpened    = "route_stop_opened"
         case navigationStarted  = "navigation_started"
 
+        // Route editor
+        case routeEditorOpened  = "route_editor_opened"
+        case routeCreated       = "route_created"
+        case routeUpdated       = "route_updated"
+        case routeDeleted       = "route_deleted"
+        case routeStopAdded     = "route_stop_added"
+        case routeStopAppended  = "route_stop_appended"
+        case placeAddedToDraft  = "place_added_to_draft"
+
         // Reviews
         case reviewFormOpened   = "review_form_opened"
         case reviewSubmitted    = "review_submitted"

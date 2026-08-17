@@ -63,6 +63,13 @@ struct ExploreCard: View {
             Text(route.title)
                 .font(.headline)
                 .lineLimit(2)
+
+            //–– Author
+            if let author = route.authorName {
+                Label("by \(author)", systemImage: "person.circle")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
             //–– Meta (rating • duration)
             HStack(spacing: 8) {

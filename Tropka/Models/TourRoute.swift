@@ -5,6 +5,9 @@ import Foundation
 struct TourRoute: Identifiable, Equatable, Codable {
     let id: String          // uuid stored as string
     let authorUID: String
+    /// Display name of the author, from the embedded users row.
+    /// nil when the query did not ask for `users(...)`.
+    let authorName: String?
     let title: String
     let duration: Int       // minutes
     let rating: Double
@@ -15,9 +18,21 @@ struct TourRoute: Identifiable, Equatable, Codable {
 
     // MARK: Codable
 
+    /// Shape of the embedded `users(full_name, username)` join.
+    private struct AuthorRow: Decodable {
+        let fullName: String?
+        let username: String?
+
+        enum CodingKeys: String, CodingKey {
+            case fullName = "full_name"
+            case username
+        }
+    }
+
     enum CodingKeys: String, CodingKey {
         case id
         case authorUID   = "author_uid"
+        case author      = "users"
         case title
         case duration
         case rating
@@ -39,6 +54,14 @@ struct TourRoute: Identifiable, Equatable, Codable {
         tags        = (try? c.decodeIfPresent([String].self, forKey: .tags)) ?? []
         let urlStr  = try? c.decodeIfPresent(String.self, forKey: .thumbnailURL)
         thumbnailURL = urlStr.flatMap(URL.init)
+
+        let author = try? c.decodeIfPresent(AuthorRow.self, forKey: .author)
+        let fullName = author?.fullName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let fullName, !fullName.isEmpty {
+            authorName = fullName
+        } else {
+            authorName = author?.username
+        }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -52,6 +75,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         try c.encode(stopsCount, forKey: .stopsCount)
         try c.encode(tags, forKey: .tags)
         try c.encodeIfPresent(thumbnailURL?.absoluteString, forKey: .thumbnailURL)
+        // authorName is derived from a join, never written back.
     }
 
     static func == (lhs: TourRoute, rhs: TourRoute) -> Bool { lhs.id == rhs.id }

@@ -6,6 +6,9 @@ import CoreLocation
 
 struct Stop: Identifiable, Equatable {
     let id: String
+    /// public.places.id — route_stops.place_id is NOT NULL, so every stop is a
+    /// real curated place rather than an arbitrary coordinate.
+    let placeID: Int
     let name: String
     let lat: Double
     let lng: Double
