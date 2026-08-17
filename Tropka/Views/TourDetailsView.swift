@@ -5,6 +5,8 @@ import CoreLocation
 // MARK: – Route details
 struct TourDetailsView: View {
     let route: TourRoute
+    /// Where the user came from — lets us compare Explore vs Map vs Profile as entry points.
+    var source: Analytics.Source = .explore
     let locationManager = CLLocationManager()
     @StateObject private var vm = TourDetailsViewModel()
     @Environment(\.dismiss) private var dismiss
@@ -93,12 +95,24 @@ struct TourDetailsView: View {
                     // ── Actions ──────────────────────────────────────
                     HStack(spacing: 0) {
                         if !vm.isLoading && !vm.stops.isEmpty {
-                            ActionButton(icon: "map.fill", label: "Map", color: .blue) { showMap = true }
+                            ActionButton(icon: "map.fill", label: "Map", color: .blue) {
+                                Analytics.track(.routeMapOpened, [
+                                    "route_id": route.id,
+                                    "route_title": route.title,
+                                    "stops_count": vm.stops.count
+                                ])
+                                showMap = true
+                            }
                             Divider().frame(height: 36)
                         }
 
                         if vm.isSaved {
                             ActionButton(icon: "bookmark.fill", label: "Saved", color: .blue) {
+                                Analytics.track(.routeUnsaved, [
+                                    "route_id": route.id,
+                                    "route_title": route.title,
+                                    "source": Analytics.Source.explore.rawValue
+                                ])
                                 Task { await vm.unsaveRoute(routeID: route.id) }
                             }
                             Divider().frame(height: 36)
@@ -106,9 +120,20 @@ struct TourDetailsView: View {
                                 icon: vm.myReview == nil ? "square.and.pencil" : "pencil",
                                 label: vm.myReview == nil ? "Review" : "Edit",
                                 color: .purple
-                            ) { showReviewSheet = true }
+                            ) {
+                                Analytics.track(.reviewFormOpened, [
+                                    "route_id": route.id,
+                                    "is_edit": vm.myReview != nil
+                                ])
+                                showReviewSheet = true
+                            }
                         } else {
                             ActionButton(icon: "bookmark", label: "Save", color: .blue) {
+                                Analytics.track(.routeSaved, [
+                                    "route_id": route.id,
+                                    "route_title": route.title,
+                                    "source": "route_details"
+                                ])
                                 Task { await vm.saveRoute(routeID: route.id) }
                             }
                         }
@@ -161,6 +186,13 @@ struct TourDetailsView: View {
             .padding(.leading, 16)
         }
         .navigationBarHidden(true)
+        .trackScreen("RouteDetails", [
+            "route_id": route.id,
+            "route_title": route.title,
+            "source": source.rawValue,
+            "rating": route.rating,
+            "stops_count": route.stopsCount
+        ])
         .onAppear {
             locationManager.requestWhenInUseAuthorization()
             Task { await vm.load(routeID: route.id) }
@@ -172,7 +204,15 @@ struct TourDetailsView: View {
                     userID: supabase.auth.currentUser?.id.uuidString ?? "",
                     routeTitle: route.title, rating: 5, text: "", createdAt: .now
                 )
-            ) { review in Task { await vm.saveReview(review) } }
+            ) { review in
+                Analytics.track(.reviewSubmitted, [
+                    "route_id": route.id,
+                    "rating": review.rating,
+                    "text_length": review.text.count,
+                    "is_edit": vm.myReview != nil
+                ])
+                Task { await vm.saveReview(review) }
+            }
         }
         .navigationDestination(isPresented: $showMap) {
             RouteMapView(vm: vm)

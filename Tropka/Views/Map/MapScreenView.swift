@@ -7,6 +7,7 @@ struct MapScreenView: View {
     @State private var selectedPlace: Place?
     @State private var bottomSheetHeight: CGFloat = 0
     @State private var showFilters = false
+    @State private var searchDebounce: Task<Void, Never>?
 
     private let minBottomSheetHeight: CGFloat = 120
     private let maxBottomSheetHeight: CGFloat = UIScreen.main.bounds.height * 0.7
@@ -16,6 +17,12 @@ struct MapScreenView: View {
             MapboxMapView(
                 places: vm.filteredPlaces,
                 onPinTapped: { place in
+                    Analytics.track(.mapPinTapped, [
+                        "place_id": place.id,
+                        "place_name": place.name,
+                        "category": place.category.displayName,
+                        "rating": place.rating
+                    ])
                     selectedPlace = place
                     bottomSheetHeight = minBottomSheetHeight
                 }
@@ -46,6 +53,7 @@ struct MapScreenView: View {
         .sheet(isPresented: $showFilters) {
             MapFiltersView(selectedCategories: $vm.selectedCategories)
         }
+        .trackScreen("Map")
         .onAppear { vm.loadPlaces() }
     }
 
@@ -59,6 +67,18 @@ struct MapScreenView: View {
                     .textFieldStyle(.plain)
                     .onChange(of: searchText) {
                         vm.searchQuery = searchText
+                        // Debounced so we log one search per query, not one per keystroke.
+                        searchDebounce?.cancel()
+                        let query = searchText
+                        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                        searchDebounce = Task {
+                            try? await Task.sleep(nanoseconds: 800_000_000)
+                            guard !Task.isCancelled else { return }
+                            Analytics.track(.mapSearched, [
+                                "query": query,
+                                "results_count": vm.filteredPlaces.count
+                            ])
+                        }
                     }
 
                 if !searchText.isEmpty {
@@ -72,7 +92,10 @@ struct MapScreenView: View {
             .background(.regularMaterial)
             .cornerRadius(10)
 
-            Button(action: { showFilters = true }) {
+            Button(action: {
+                Analytics.track(.mapFiltersOpened)
+                showFilters = true
+            }) {
                 Image(systemName: "line.3.horizontal.decrease")
                     .font(.system(size: 20))
                     .foregroundColor(.primary)
@@ -91,6 +114,7 @@ struct MapScreenView: View {
                 Spacer()
                 VStack(spacing: 8) {
                     Button(action: {
+                        Analytics.track(.mapZoomed, ["direction": "in"])
                         NotificationCenter.default.post(name: .zoomIn, object: nil)
                     }) {
                         Image(systemName: "plus")
@@ -102,6 +126,7 @@ struct MapScreenView: View {
                     }
 
                     Button(action: {
+                        Analytics.track(.mapZoomed, ["direction": "out"])
                         NotificationCenter.default.post(name: .zoomOut, object: nil)
                     }) {
                         Image(systemName: "minus")

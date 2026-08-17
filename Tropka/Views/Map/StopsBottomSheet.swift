@@ -19,7 +19,14 @@ struct StopsBottomSheet: View {
         return AnyView(
             VStack(spacing: 0) {
                 // Current stop card — tappable for detail
-                Button { selectedStop = stop } label: {
+                Button {
+                    Analytics.track(.routeStopOpened, [
+                        "stop_name": stop.name,
+                        "stop_index": selectedIndex,
+                        "stops_total": stops.count
+                    ])
+                    selectedStop = stop
+                } label: {
                     HStack(spacing: 14) {
                         // Number badge
                         ZStack {
@@ -60,6 +67,11 @@ struct StopsBottomSheet: View {
                 HStack(spacing: 0) {
                     // Prev
                     Button {
+                        Analytics.track(.routeStopStepped, [
+                            "direction": "prev",
+                            "to_index": max(0, selectedIndex - 1),
+                            "stops_total": stops.count
+                        ])
                         withAnimation { selectedIndex = max(0, selectedIndex - 1) }
                     } label: {
                         Image(systemName: "chevron.left")
@@ -76,6 +88,11 @@ struct StopsBottomSheet: View {
 
                     // Next
                     Button {
+                        Analytics.track(.routeStopStepped, [
+                            "direction": "next",
+                            "to_index": min(stops.count - 1, selectedIndex + 1),
+                            "stops_total": stops.count
+                        ])
                         withAnimation { selectedIndex = min(stops.count - 1, selectedIndex + 1) }
                     } label: {
                         Image(systemName: "chevron.right")
@@ -86,7 +103,14 @@ struct StopsBottomSheet: View {
 
                     // Start Navigation
                     if let action = navButtonAction {
-                        Button(action: action) {
+                        Button {
+                            // The core conversion event: someone actually starts walking a route.
+                            Analytics.track(.navigationStarted, [
+                                "from_stop_index": selectedIndex,
+                                "stops_total": stops.count
+                            ])
+                            action()
+                        } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: "arrow.triangle.turn.up.right.circle.fill")
                                 Text("Navigate")

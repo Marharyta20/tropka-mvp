@@ -6,6 +6,10 @@
 	<string>$(MBXAccessToken)</string>
         <key>MGLMapboxAccessToken</key>
         <string>$(MGLMapboxAccessToken)</string>
+        <key>POSTHOG_API_KEY</key>
+        <string>$(POSTHOG_API_KEY)</string>
+        <key>POSTHOG_HOST</key>
+        <string>$(POSTHOG_HOST)</string>
         <key>NSLocationWhenInUseUsageDescription</key>
         <string>This app needs your location to show where you are on the map.</string>
         <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

@@ -34,9 +34,17 @@ struct ProfileView: View {
             .navigationDestination(isPresented: $showSettings) {
                 SettingsView(profileVM: vm)
             }
+            .trackScreen("Profile")
         }
         .sheet(item: $editingReview) { rev in
             EditReviewSheet(draft: rev) { new in
+                Analytics.track(.reviewSubmitted, [
+                    "route_id": new.routeID,
+                    "rating": new.rating,
+                    "text_length": new.text.count,
+                    "is_edit": true,
+                    "source": Analytics.Source.profile.rawValue
+                ])
                 Task { await vm.update(review: new) }
             }
         }
@@ -79,6 +87,9 @@ struct ProfileView: View {
             ShareLink("Share profile", item: shareProfileText)
                 .buttonStyle(.bordered)
                 .frame(maxWidth: .infinity)
+                .simultaneousGesture(TapGesture().onEnded {
+                    Analytics.track(.profileShared)
+                })
         }
     }
 
@@ -97,6 +108,7 @@ struct ProfileView: View {
     }
     private func tabButton(title: String, tab: Tab) -> some View {
         Button {
+            Analytics.track(.profileTabSwitched, ["tab": String(describing: tab)])
             withAnimation(.easeInOut) { selectedTab = tab }
         } label: {
             VStack(spacing: 4) {
@@ -137,6 +149,13 @@ struct ProfileView: View {
                 } label: {
                     ProfileRouteCell(item: item)
                 }
+                .simultaneousGesture(TapGesture().onEnded {
+                    Analytics.track(.routeOpened, [
+                        "route_id": item.route.id,
+                        "route_title": item.route.title,
+                        "source": Analytics.Source.profile.rawValue
+                    ])
+                })
                 .swipeActions {
                     Button(role: .destructive) {
                         pendingDelete = item
@@ -156,6 +175,11 @@ struct ProfileView: View {
                             isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 if let r = pendingDelete {
+                    Analytics.track(.routeUnsaved, [
+                        "route_id": r.route.id,
+                        "route_title": r.route.title,
+                        "source": Analytics.Source.profile.rawValue
+                    ])
                     Task { await vm.unsave(routeID: r.route.id) }
                 }
             }
@@ -170,10 +194,19 @@ struct ProfileView: View {
                 ReviewRow(review: rev)
                     .swipeActions {
                         Button(role: .destructive) {
+                            Analytics.track(.reviewDeleted, [
+                                "route_id": rev.routeID,
+                                "rating": rev.rating
+                            ])
                             Task { await vm.delete(review: rev) }
                         } label: { Label("Delete", systemImage: "trash") }
-                        
+
                         Button {
+                            Analytics.track(.reviewFormOpened, [
+                                "route_id": rev.routeID,
+                                "is_edit": true,
+                                "source": Analytics.Source.profile.rawValue
+                            ])
                             editingReview = rev
                         } label: { Label("Edit", systemImage: "pencil") }
                     }

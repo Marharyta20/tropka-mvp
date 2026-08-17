@@ -22,6 +22,7 @@ struct CreatorView: View {
                 .task { await vm.reload() }
                 .sheet(item: $selectedTip) { TipDetailView(tip: $0) }
         }
+        .trackScreen("Tips")
     }
 
     @ViewBuilder
@@ -30,7 +31,13 @@ struct CreatorView: View {
             Section {
                 ForEach(visibleTips) { tip in
                     TipBannerCell(tip: tip)
-                        .onTapGesture { selectedTip = tip }
+                        .onTapGesture {
+                            Analytics.track(.tipOpened, [
+                                "tip_id": tip.id,
+                                "tip_title": tip.title
+                            ])
+                            selectedTip = tip
+                        }
                         .onAppear {
                             if tip == vm.tips.last {
                                 Task { await vm.fetchMore() }

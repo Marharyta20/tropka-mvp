@@ -58,6 +58,7 @@ struct LoginView: View {
             .padding(.top, 10)
 
             Button(action: {
+                Analytics.track(.authModeToggled, ["to": isSignUpMode ? "log_in" : "sign_up"])
                 withAnimation {
                     isSignUpMode.toggle()
                     authVM.errorMessage = nil
@@ -69,6 +70,7 @@ struct LoginView: View {
         }
         .padding()
         .animation(.default, value: isSignUpMode)
+        .trackScreen("Login")
     }
 }
 

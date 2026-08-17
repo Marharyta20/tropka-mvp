@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @State private var selection: Tab = .routes
+    // Must match a tab that actually exists — see the commented-out `.routes` tab below.
+    @State private var selection: Tab = .explore
 
     enum Tab {
         case explore, map, routes, tips, profile
@@ -44,6 +45,9 @@ struct MainTabView: View {
                     Text("Profile")
                 }
                 .tag(Tab.profile)
+        }
+        .onChange(of: selection) { _, newTab in
+            Analytics.track(.tabSwitched, ["tab": String(describing: newTab)])
         }
     }
 }

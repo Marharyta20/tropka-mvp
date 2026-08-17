@@ -11,6 +11,10 @@ class AuthViewModel: ObservableObject {
 
     init() {
         isAuthenticated = supabase.auth.currentSession != nil
+        // Returning user: re-attach analytics to their id before anything else is tracked.
+        if let userID = supabase.auth.currentUser?.id.uuidString {
+            Analytics.identify(userID: userID)
+        }
         listenToAuthChanges()
     }
 
@@ -19,6 +23,10 @@ class AuthViewModel: ObservableObject {
             for await (_, session) in supabase.auth.authStateChanges {
                 await MainActor.run {
                     self.isAuthenticated = session != nil
+                    // Tie everything the anonymous session did to the real user id.
+                    if let userID = session?.user.id.uuidString {
+                        Analytics.identify(userID: userID)
+                    }
                 }
             }
         }
@@ -36,7 +44,9 @@ class AuthViewModel: ObservableObject {
         Task {
             do {
                 try await AuthService.shared.signUp(email: email, password: password, fullName: fullName)
+                Analytics.track(.signedUp)
             } catch {
+                Analytics.track(.authFailed, ["mode": "sign_up", "reason": error.localizedDescription])
                 await MainActor.run { self.errorMessage = error.localizedDescription }
             }
             await MainActor.run { self.isLoading = false }
@@ -55,7 +65,9 @@ class AuthViewModel: ObservableObject {
         Task {
             do {
                 try await AuthService.shared.signIn(email: email, password: password)
+                Analytics.track(.loggedIn)
             } catch {
+                Analytics.track(.authFailed, ["mode": "log_in", "reason": error.localizedDescription])
                 await MainActor.run { self.errorMessage = error.localizedDescription }
             }
             await MainActor.run { self.isLoading = false }
@@ -67,6 +79,8 @@ class AuthViewModel: ObservableObject {
     func signOut() {
         Task {
             try? await AuthService.shared.signOut()
+            Analytics.track(.signedOut)
+            Analytics.reset()   // next person on this device is a separate user
             await MainActor.run {
                 self.isAuthenticated = false
                 self.email = ""

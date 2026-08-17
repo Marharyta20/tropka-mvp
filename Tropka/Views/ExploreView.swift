@@ -5,6 +5,7 @@ struct ExploreView: View {
     
     @State private var searchText = ""
     @State private var selectedTag: String?
+    @State private var searchDebounce: Task<Void, Never>?
 
     // — Фильтрованный массив
     var filteredRoutes: [TourRoute] {
@@ -38,11 +39,25 @@ struct ExploreView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
                     .padding(.horizontal, 16)
+                    // Debounced so we log one search per query, not one per keystroke.
+                    .onChange(of: searchText) { _, newValue in
+                        searchDebounce?.cancel()
+                        guard !newValue.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                        searchDebounce = Task {
+                            try? await Task.sleep(nanoseconds: 800_000_000)
+                            guard !Task.isCancelled else { return }
+                            Analytics.track(.exploreSearched, [
+                                "query": newValue,
+                                "results_count": filteredRoutes.count
+                            ])
+                        }
+                    }
                 
                 // ——— Tag filter row
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         Button("All") {
+                            Analytics.track(.exploreTagFiltered, ["tag": "all"])
                             selectedTag = nil
                         }
                         .font(.caption)
@@ -53,6 +68,10 @@ struct ExploreView: View {
                         
                         ForEach(allTags, id: \.self) { tag in
                             Button(tag.capitalized) {
+                                Analytics.track(.exploreTagFiltered, [
+                                    "tag": tag,
+                                    "results_count": vm.routes.filter { $0.tags.contains(tag) }.count
+                                ])
                                 selectedTag = tag
                             }
                             .font(.caption)
@@ -79,10 +98,21 @@ struct ExploreView: View {
                             LazyVStack(spacing: 24) {
                                 ForEach(filteredRoutes) { r in
                                     // NavigationLink для NavigationStack
-                                    NavigationLink(destination: TourDetailsView(route: r)) {
+                                    NavigationLink(destination: TourDetailsView(route: r, source: .explore)) {
                                         ExploreCard(route: r)
                                     }
                                     .buttonStyle(.plain)
+                                    .simultaneousGesture(TapGesture().onEnded {
+                                        Analytics.track(.routeOpened, [
+                                            "route_id": r.id,
+                                            "route_title": r.title,
+                                            "source": Analytics.Source.explore.rawValue,
+                                            "rating": r.rating,
+                                            "stops_count": r.stopsCount,
+                                            "has_search": !searchText.isEmpty,
+                                            "has_tag_filter": selectedTag != nil
+                                        ])
+                                    })
                                 }
                                 
                                 if filteredRoutes.isEmpty {
@@ -95,13 +125,17 @@ struct ExploreView: View {
                             .padding(.top, 12)
                             .padding(.bottom, 32)
                         }
-                        .refreshable { vm.loadRoutes() }
+                        .refreshable {
+                            Analytics.track(.exploreRefreshed)
+                            vm.loadRoutes()
+                        }
                     }
                 }
                 .animation(.default, value: filteredRoutes)
             }
             .navigationTitle("Explore")
         }
+        .trackScreen("Explore")
         .onAppear {
             if vm.routes.isEmpty { vm.loadRoutes() }
         }

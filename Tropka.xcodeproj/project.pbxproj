@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A823900D30334F4500996EA8 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = A823900C30334F4500996EA8 /* PostHog */; };
 		A8ACB9BE2F0EE20800170910 /* SDWebImageSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACB9BD2F0EE20800170910 /* SDWebImageSwiftUI */; };
 		A8ACBA2E2F0EED0900170910 /* MapboxDirections in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACBA2D2F0EED0900170910 /* MapboxDirections */; };
 		A8ACBA302F0EED0900170910 /* MapboxNavigationCore in Frameworks */ = {isa = PBXBuildFile; productRef = A8ACBA2F2F0EED0900170910 /* MapboxNavigationCore */; };
@@ -84,6 +85,7 @@
 				A8ACBA302F0EED0900170910 /* MapboxNavigationCore in Frameworks */,
 				A8FF8CDC2FD5ED3200361A67 /* PostgREST in Frameworks */,
 				A8FF8CDE2FD5ED3200361A67 /* Realtime in Frameworks */,
+				A823900D30334F4500996EA8 /* PostHog in Frameworks */,
 				A8ACBA2E2F0EED0900170910 /* MapboxDirections in Frameworks */,
 				A8ACB9BE2F0EE20800170910 /* SDWebImageSwiftUI in Frameworks */,
 				A8FF8CE02FD5ED3200361A67 /* Storage in Frameworks */,
@@ -168,6 +170,7 @@
 				A8FF8CDB2FD5ED3200361A67 /* PostgREST */,
 				A8FF8CDD2FD5ED3200361A67 /* Realtime */,
 				A8FF8CDF2FD5ED3200361A67 /* Storage */,
+				A823900C30334F4500996EA8 /* PostHog */,
 			);
 			productName = Tropka;
 			productReference = A87F86A12DCB4DE700462F82 /* Tropka.app */;
@@ -255,6 +258,7 @@
 				A8ACB9BC2F0EE20800170910 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */,
 				A8ACBA2C2F0EED0900170910 /* XCRemoteSwiftPackageReference "mapbox-navigation-ios" */,
 				A8FF8CD62FD5ED3200361A67 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				A823900B30334F4500996EA8 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A87F86A22DCB4DE700462F82 /* Products */;
@@ -629,6 +633,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A823900B30334F4500996EA8 /* XCRemoteSwiftPackageReference "posthog-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/PostHog/posthog-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.69.6;
+			};
+		};
 		A8ACB9BC2F0EE20800170910 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/SDWebImage/SDWebImageSwiftUI";
@@ -656,6 +668,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A823900C30334F4500996EA8 /* PostHog */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A823900B30334F4500996EA8 /* XCRemoteSwiftPackageReference "posthog-ios" */;
+			productName = PostHog;
+		};
 		A8ACB9BD2F0EE20800170910 /* SDWebImageSwiftUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A8ACB9BC2F0EE20800170910 /* XCRemoteSwiftPackageReference "SDWebImageSwiftUI" */;

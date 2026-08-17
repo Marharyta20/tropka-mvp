@@ -1,5 +1,5 @@
 {
-  "originHash" : "4b0f0263b35e7de10c2d536cc92d8cd443313170e2b7b431f45cc6d28c02d6ef",
+  "originHash" : "da22e59abbc23cd39ad5d49ff2fb96e11166e8465ea06ad43633cf18bbde6161",
   "pins" : [
     {
       "identity" : "mapbox-common-ios",
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "97c668aa4908b86c4557a6eb643cf0c732d70393",
         "version" : "324.17.0"
+      }
+    },
+    {
+      "identity" : "posthog-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/PostHog/posthog-ios",
+      "state" : {
+        "revision" : "c0218386c49115cce6b05a50b41f4f60bc995acb",
+        "version" : "3.69.6"
       }
     },
     {

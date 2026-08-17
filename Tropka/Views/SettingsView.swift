@@ -22,7 +22,13 @@ struct SettingsView: View {
                 //–– Save
                 Button("Save") {
                     Task {
+                        let changedName = vm.displayName != profileVM.displayName
+                        let changedUsername = vm.username != profileVM.handle
                         await vm.save()
+                        Analytics.track(.settingsSaved, [
+                            "changed_name": changedName,
+                            "changed_username": changedUsername
+                        ])
                         profileVM.displayName = vm.displayName
                         profileVM.handle      = vm.username
                         showSaved = true
@@ -33,6 +39,8 @@ struct SettingsView: View {
 
                 //–– Sign out
                 Button("Sign Out", role: .destructive) {
+                    Analytics.track(.signedOut, ["source": "settings"])
+                    Analytics.reset()
                     vm.signOut()
                     dismiss()
                 }
@@ -41,7 +49,9 @@ struct SettingsView: View {
                 //–– Delete
                 Button("Delete Account", role: .destructive) {
                     Task {
+                        Analytics.track(.accountDeleted)
                         await vm.deleteAccount()
+                        Analytics.reset()
                         dismiss()
                     }
                 }
@@ -51,6 +61,7 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("Settings")
         .overlay {
             if vm.isBusy {
                 ProgressView()

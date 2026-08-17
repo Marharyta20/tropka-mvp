@@ -7,19 +7,18 @@ struct MapboxSearchResult: Identifiable {
     let name: String
     let coordinate: CLLocationCoordinate2D
     let subtitle: String?
+    /// Stable Mapbox POI identifier. Populated by the Search Box API only —
+    /// Geocoding v5 has no equivalent, so it stays nil there.
+    /// Persist this instead of the POI payload itself (see Places API storage terms).
+    var mapboxID: String?
+    /// Canonical Mapbox POI category, e.g. "coffee_shop". Search Box only.
+    var poiCategory: String?
 }
 
 final class MapboxSearchService {
     static let shared = MapboxSearchService()
 
-    // Tries to read token from Info.plist key `MAPBOX_ACCESS_TOKEN` first.
-    // If missing, falls back to an empty string (developer must set it).
-    private let accessToken: String = {
-        if let token = Bundle.main.object(forInfoDictionaryKey: "MAPBOX_ACCESS_TOKEN") as? String, !token.isEmpty {
-            return token
-        }
-        return "" // TODO: Set your Mapbox access token in Info.plist under MAPBOX_ACCESS_TOKEN
-    }()
+    private let accessToken = MapboxToken.value
 
     private let session = URLSession(configuration: .default)
 
@@ -30,9 +29,7 @@ final class MapboxSearchService {
     ///   - limit: Max number of results (default 10).
     func search(query: String, proximity: CLLocationCoordinate2D? = nil, limit: Int = 10) async throws -> [MapboxSearchResult] {
         guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
-        guard !accessToken.isEmpty else {
-            throw NSError(domain: "MapboxSearchService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Missing Mapbox access token. Set MAPBOX_ACCESS_TOKEN in Info.plist."])
-        }
+        guard !accessToken.isEmpty else { throw MapboxToken.missingTokenError }
 
         // URL encode query
         let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query

@@ -167,11 +167,27 @@ struct PlaceBottomSheet: View {
                         ForEach(relatedRoutes) { route in
                             CompactRouteCard(route: route)
                                 .padding(.horizontal, 20)
+                                // These cards don't navigate anywhere yet — tracking the tap
+                                // shows how much demand there is for wiring them up.
+                                .onTapGesture {
+                                    Analytics.track(.placeRouteTapped, [
+                                        "place_id": place.id,
+                                        "route_id": route.id,
+                                        "route_title": route.title
+                                    ])
+                                }
                         }
                     }
                 }
 
-                Button(action: {}) {
+                Button(action: {
+                    // Same here: no review flow for places yet, but we can measure the demand.
+                    Analytics.track(.reviewFormOpened, [
+                        "place_id": place.id,
+                        "target": "place",
+                        "is_edit": false
+                    ])
+                }) {
                     Text("Leave a Review")
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -194,6 +210,7 @@ struct PlaceBottomSheet: View {
             }
             .onEnded { _ in
                 isDragging = false
+                let staysCollapsed = height < minHeight + 50
                 withAnimation(.spring()) {
                     if height < minHeight + 50 {
                         height = minHeight
@@ -202,6 +219,15 @@ struct PlaceBottomSheet: View {
                     } else {
                         height = maxHeight / 2
                     }
+                }
+                // Pulling the sheet open is the real "I'm interested in this place" signal.
+                if !staysCollapsed, let place {
+                    Analytics.track(.mapPlaceExpanded, [
+                        "place_id": place.id,
+                        "place_name": place.name,
+                        "category": place.category.displayName,
+                        "related_routes_count": relatedRoutes.count
+                    ])
                 }
             }
     }

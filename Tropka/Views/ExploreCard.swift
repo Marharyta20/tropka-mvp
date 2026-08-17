@@ -94,6 +94,11 @@ struct ExploreCard: View {
             Button(vm.isSaved ? "Saved" : "Save") {
                 Task {
                     await vm.save()
+                    Analytics.track(.routeSaved, [
+                        "route_id": route.id,
+                        "route_title": route.title,
+                        "source": Analytics.Source.explore.rawValue
+                    ])
                     showToast = true
                 }
             }

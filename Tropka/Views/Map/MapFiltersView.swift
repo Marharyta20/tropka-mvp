@@ -35,7 +35,18 @@ struct MapFiltersView: View {
             }
             .navigationTitle("Filter Map")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("Done") { dismiss() } } }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        Analytics.track(.mapFiltersApplied, [
+                            "categories": selectedCategories.map(\.displayName).sorted(),
+                            "selected_count": selectedCategories.count,
+                            "total_count": PlaceCategory.allCases.count
+                        ])
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }
