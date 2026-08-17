@@ -155,8 +155,7 @@ struct MapView: View {
     private func uploadThumbnail(data: Data) async {
         await MainActor.run { isUploading = true }
         do {
-            let path = "thumbnails/\(UUID().uuidString).jpg"
-            let url = try await StorageService.shared.uploadImage(data, path: path)
+            let url = try await StorageService.shared.uploadRouteThumbnail(data)
             await MainActor.run {
                 self.thumbnailURL = url
                 self.isUploading = false
