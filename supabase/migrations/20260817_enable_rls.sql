@@ -1,29 +1,31 @@
 -- ============================================================================
--- Tropka — включение Row Level Security
+-- Tropka — enable Row Level Security
+-- Applied 2026-08-17.
 --
--- Запускать целиком в Supabase → SQL Editor. Транзакция: если что-то упадёт,
--- откатится всё, база останется в текущем состоянии.
+-- Run as a whole in Supabase → SQL Editor. It is one transaction: if anything
+-- fails, everything rolls back and the database stays as it was.
 --
--- Логика доступа:
---   справочники (places, cities, categories, districts, tips, tip_pages)
---       — читают все залогиненные, пишет только service_role (дашборд, скрипты)
+-- Access model:
+--   reference data (places, cities, categories, districts, tips, tip_pages)
+--       — readable by any signed-in user, writable only via service_role
+--         (dashboard, import scripts)
 --   routes, route_stops
---       — читают все залогиненные, правит только автор маршрута
+--       — readable by any signed-in user, writable only by the route author
 --   reviews, saved_routes, users
---       — каждый видит и правит только своё
+--       — each user sees and edits only their own rows
 -- ============================================================================
 
 begin;
 
 -- ----------------------------------------------------------------------------
--- 1. Триггеры пересчёта. Это обязательный шаг, не косметика.
+-- 1. Aggregation triggers. This step is mandatory, not cosmetic.
 --
--- update_route_rating висит на reviews и пишет в routes.rating. Без SECURITY
--- DEFINER он выполняется от имени того, кто вставил отзыв — и упирается в
--- политику "правит только автор". Итог: любой отзыв на чужой маршрут падает с
--- ошибкой. Ровно на этом месте обычно и выключают RLS обратно.
+-- update_route_rating fires on reviews and writes into routes.rating. Without
+-- SECURITY DEFINER it runs as whoever inserted the review and hits the
+-- author-only UPDATE policy. Result: reviewing someone else's route fails with
+-- a permission error. This is exactly where people give up and turn RLS off.
 --
--- SET search_path заодно закрывает четыре WARN от линтера Supabase.
+-- SET search_path also clears four WARNings from the Supabase linter.
 -- ----------------------------------------------------------------------------
 
 create or replace function public.update_route_rating()
@@ -80,15 +82,17 @@ $$;
 alter function public.handle_new_auth_user() set search_path = public;
 alter function public.set_updated_at()      set search_path = public;
 
--- handle_new_auth_user — триггер на auth.users, снаружи его дёргать незачем
--- anon и authenticated наследуют EXECUTE от PUBLIC, поэтому отзываем именно у PUBLIC
+-- These are trigger functions and have no business being exposed as
+-- /rest/v1/rpc/... endpoints. anon and authenticated inherit EXECUTE from
+-- PUBLIC, so revoking from those two roles alone does nothing — revoke from
+-- PUBLIC as well.
 revoke execute on function public.handle_new_auth_user()  from public, anon, authenticated;
 revoke execute on function public.update_route_rating()   from public, anon, authenticated;
 revoke execute on function public.update_route_duration() from public, anon, authenticated;
 revoke execute on function public.set_updated_at()        from public, anon, authenticated;
 
 -- ----------------------------------------------------------------------------
--- 2. Включаем RLS на всех таблицах
+-- 2. Enable RLS on every table
 -- ----------------------------------------------------------------------------
 
 alter table public.users        enable row level security;
@@ -104,10 +108,10 @@ alter table public.tips         enable row level security;
 alter table public.tip_pages    enable row level security;
 
 -- ----------------------------------------------------------------------------
--- 3. Справочники — только чтение для залогиненных
+-- 3. Reference data — read only, for signed-in users
 --
--- Политик на insert/update/delete нет намеренно: чего нет, то запрещено.
--- Твои скрипты загрузки должны ходить с service_role ключом — он RLS обходит.
+-- No insert/update/delete policies on purpose: what does not exist is denied.
+-- Import scripts must use the service_role key, which bypasses RLS.
 -- ----------------------------------------------------------------------------
 
 create policy "places readable"     on public.places     for select to authenticated using (true);
@@ -118,11 +122,11 @@ create policy "tips readable"       on public.tips       for select to authentic
 create policy "tip_pages readable"  on public.tip_pages  for select to authenticated using (true);
 
 -- ----------------------------------------------------------------------------
--- 4. Маршруты — читают все, правит автор
+-- 4. Routes — readable by all, writable by the author
 --
--- Побочный эффект: чинится дыра в RouteEditorService.updateRoute — сейчас он
--- делает update по id без проверки авторства, то есть любой залогиненный
--- пользователь может переписать чужой маршрут. После этих политик не сможет.
+-- Side effect: this closes a hole in RouteEditorService.updateRoute, which
+-- updates by id without checking authorship — meaning any signed-in user could
+-- overwrite someone else's route. These policies stop that.
 -- ----------------------------------------------------------------------------
 
 create policy "routes readable" on public.routes
@@ -139,7 +143,7 @@ create policy "routes delete own" on public.routes
   for delete to authenticated using (author_uid = auth.uid());
 
 -- ----------------------------------------------------------------------------
--- 5. Остановки — наследуют права родительского маршрута
+-- 5. Stops — inherit the permissions of their parent route
 -- ----------------------------------------------------------------------------
 
 create policy "route_stops readable" on public.route_stops
@@ -164,11 +168,11 @@ create policy "route_stops delete via own route" on public.route_stops
   );
 
 -- ----------------------------------------------------------------------------
--- 6. Отзывы — читают все залогиненные, правит только автор
+-- 6. Reviews — readable by every signed-in user, writable by the author
 --
--- Открыто по решению от 2026-08-17: чужие отзывы должны быть видны на странице
--- маршрута. Внимание: имя автора отзыва пока показать неоткуда — users закрыт
--- политикой "только своя строка". См. комментарий в конце файла.
+-- Opened up by decision on 2026-08-17: other people's reviews should be visible
+-- on a route page. Note: the author's name cannot be displayed yet — see the
+-- follow-up migration 20260817b, which frees public.users for that.
 -- ----------------------------------------------------------------------------
 
 create policy "reviews readable" on public.reviews
@@ -185,7 +189,7 @@ create policy "reviews delete own" on public.reviews
   for delete to authenticated using (user_id = auth.uid());
 
 -- ----------------------------------------------------------------------------
--- 7. Сохранённые маршруты — строго приватные
+-- 7. Saved routes — strictly private
 -- ----------------------------------------------------------------------------
 
 create policy "saved_routes select own" on public.saved_routes
@@ -202,10 +206,13 @@ create policy "saved_routes delete own" on public.saved_routes
   for delete to authenticated using (user_id = auth.uid());
 
 -- ----------------------------------------------------------------------------
--- 8. Профили — только свой
+-- 8. Profiles — own row only
 --
--- Строку в users создаёт триггер handle_new_auth_user (SECURITY DEFINER),
--- политика insert нужна для upsert в AuthService.signUp.
+-- The row itself is created by the handle_new_auth_user trigger
+-- (SECURITY DEFINER); the insert policy is needed for the upsert in
+-- AuthService.signUp.
+--
+-- Superseded by 20260817b: once email left this table, select was opened up.
 -- ----------------------------------------------------------------------------
 
 create policy "users select own" on public.users
@@ -224,7 +231,7 @@ create policy "users delete own" on public.users
 commit;
 
 -- ============================================================================
--- Проверка после запуска: обе выборки должны вернуть пусто
+-- Post-run check: both queries should return nothing.
 --
 --   select tablename from pg_tables
 --   where schemaname = 'public' and rowsecurity = false;
@@ -233,23 +240,4 @@ commit;
 --   where schemaname = 'public'
 --     and not exists (select 1 from pg_policies p
 --                     where p.schemaname = 'public' and p.tablename = t.tablename);
--- ============================================================================
-
--- ============================================================================
--- ПРИМЕНЕНО 2026-08-17. Открытый вопрос на будущее.
---
--- reviews теперь читаются всеми, но public.users закрыт политикой "только своя
--- строка" — значит имя автора чужого отзыва в приложении не отобразится.
---
--- Правильное решение, когда дойдут руки: убрать email из public.users. Он и так
--- лежит в auth.users и доступен клиенту как supabase.auth.currentUser?.email,
--- в публичной таблице профилей ему не место. После этого users становится
--- чисто публичным профилем, и политику select можно смело открыть:
---
---   alter table public.users drop column email;   -- + убрать из AuthService.signUp
---   drop policy "users select own" on public.users;
---   create policy "users readable" on public.users
---     for select to authenticated using (true);
---
--- Пока этого не сделано — открывать users нельзя, утекут email всех юзеров.
 -- ============================================================================

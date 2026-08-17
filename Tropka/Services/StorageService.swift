@@ -3,14 +3,14 @@ import Storage
 
 // MARK: - Buckets
 
-/// Бакеты, заведённые в проекте Supabase. Имена должны совпадать с ними точно —
-/// раньше здесь был захардкожен несуществующий "tropka-media", и загрузка
-/// молча падала на каждой попытке.
+/// Buckets that exist in the Supabase project. Names must match exactly — this
+/// used to hardcode a non-existent "tropka-media", so every upload failed
+/// silently and all buckets stayed empty.
 enum StorageBucket: String {
-    case routes   // обложки маршрутов
-    case avatars  // фото профиля
-    case places   // фото мест
-    case tips     // картинки для советов
+    case routes   // route cover images
+    case avatars  // profile photos
+    case places   // place photos
+    case tips     // tip artwork
 }
 
 // MARK: - StorageService (Supabase Storage)
@@ -19,9 +19,9 @@ final class StorageService {
     static let shared = StorageService()
     private init() {}
 
-    // MARK: Универсальные операции
+    // MARK: Generic operations
 
-    /// Загружает данные в указанный бакет и возвращает публичную ссылку.
+    /// Uploads data to the given bucket and returns its public URL.
     @discardableResult
     func uploadImage(_ data: Data,
                      to bucket: StorageBucket,
@@ -33,26 +33,26 @@ final class StorageService {
         return try supabase.storage.from(bucket.rawValue).getPublicURL(path: path)
     }
 
-    /// Публичная ссылка на уже существующий файл — без загрузки.
+    /// Public URL for a file that already exists — no upload.
     func publicURL(in bucket: StorageBucket, path: String) throws -> URL {
         try supabase.storage.from(bucket.rawValue).getPublicURL(path: path)
     }
 
-    // MARK: Типовые сценарии
+    // MARK: Named use cases
 
-    /// Обложка маршрута.
+    /// Route cover image.
     func uploadRouteThumbnail(_ data: Data) async throws -> URL {
         try await uploadImage(data,
                               to: .routes,
                               path: "thumbnails/\(UUID().uuidString).jpg")
     }
 
-    /// Аватар пользователя.
+    /// User avatar.
     ///
-    /// Путь обязан начинаться с папки, равной auth.uid() — этого требует политика
-    /// хранилища "Auth upload avatars". Поэтому формируем его здесь, а не на
-    /// стороне вызова: иначе рано или поздно кто-то передаст произвольный путь
-    /// и получит невнятный 403.
+    /// The path must start with a folder equal to `auth.uid()` — the storage
+    /// policy "Auth upload avatars" checks `(storage.foldername(name))[1]`.
+    /// The path is built here rather than at the call site, so nobody can pass
+    /// an arbitrary one and get an opaque 403.
     func uploadAvatar(_ data: Data) async throws -> URL {
         guard let uid = supabase.auth.currentUser?.id.uuidString else {
             throw URLError(.userAuthenticationRequired)

@@ -1,7 +1,7 @@
 import Foundation
 
 // MARK: - SupabaseService
-// Replaces FirestoreService. Provides read access to routes and stops.
+// Read access to routes and stops.
 
 final class SupabaseService {
     static let shared = SupabaseService()
@@ -69,5 +69,3 @@ final class SupabaseService {
     }
 }
 
-// Backward-compat alias so existing call-sites compile without changes.
-typealias FirestoreService = SupabaseService

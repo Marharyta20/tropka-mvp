@@ -6,7 +6,7 @@ import Turf
 
 struct MapRepresentable: UIViewRepresentable {
 
-    // Входные данные
+    // Inputs
     let stops: [Stop]
     let routeCoords: [CLLocationCoordinate2D]
     var selectedStopIndex: Int = 0

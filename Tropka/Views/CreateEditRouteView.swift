@@ -1,6 +1,5 @@
 import SwiftUI
 import CoreLocation
-import MapboxMaps // Вы импортировали Mapbox, но этот экран использует Apple Maps (MapKit)
 import UIKit
 import MapKit
 
@@ -24,7 +23,7 @@ struct MapView: View {
     @State private var errorMessage: String?
     @State private var imagePickerDelegate: ImagePickerDelegateWrapper?  // Added strong delegate reference
 
-    // ИСПРАВЛЕНИЕ: Используем MapCameraPosition вместо MKCoordinateRegion для iOS 17+
+    // MapCameraPosition (iOS 17+) rather than MKCoordinateRegion
     @State private var position: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
@@ -102,9 +101,8 @@ struct MapView: View {
             }
             .padding(.horizontal)
 
-            // ИСПРАВЛЕНИЕ: Map iOS 17
             Map(position: $position) {
-                // Сюда можно добавлять маркеры (Annotation)
+                // Markers (Annotation) can be added here
             }
             .mapControls {
                 MapUserLocationButton()
@@ -112,7 +110,7 @@ struct MapView: View {
                 MapScaleView()
             }
             .safeAreaInset(edge: .bottom) {
-                // Кнопка сохранения поверх карты (опционально)
+                // Optional save button laid over the map
                 Button {
                     Task { await saveRoute() }
                 } label: {
@@ -199,7 +197,7 @@ struct MapView: View {
     }
 }
 
-// Вспомогательная структура для Alert
+// Helper wrapper so an error string can drive .alert(item:)
 struct ErrorWrapper: Identifiable {
     let id = UUID()
     let error: String

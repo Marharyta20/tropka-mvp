@@ -7,30 +7,29 @@ struct ExploreView: View {
     @State private var selectedTag: String?
     @State private var searchDebounce: Task<Void, Never>?
 
-    // — Фильтрованный массив
+    // Filtered list
     var filteredRoutes: [TourRoute] {
         var result = vm.routes
 
-        // Фильтр: поиск
+        // Filter: search
         if !searchText.isEmpty {
             result = result.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
         }
-        // Фильтр: по тегу
+        // Filter: by tag
         if let tag = selectedTag {
             result = result.filter { $0.tags.contains(tag) }
         }
-        // Сортировка: по рейтингу
+        // Sort: by rating
         result = result.sorted { $0.rating > $1.rating }
         return result
     }
     
-    // — Все доступные теги из списка маршрутов
+    // Every tag present in the loaded routes
     var allTags: [String] {
         Set(vm.routes.flatMap { $0.tags }).sorted()
     }
     
     var body: some View {
-        // ИСПРАВЛЕНИЕ: NavigationStack вместо NavigationView
         NavigationStack {
             VStack(spacing: 10) {
                 // ——— Search bar
@@ -90,14 +89,12 @@ struct ExploreView: View {
                         ProgressView("Loading…")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    // ИСПРАВЛЕНИЕ: vm.errorMessage вместо vm.errorMsg
                     else if let msg = vm.errorMessage {
                         ErrorBlock(message: msg) { vm.loadRoutes() }
                     } else {
                         ScrollView {
                             LazyVStack(spacing: 24) {
                                 ForEach(filteredRoutes) { r in
-                                    // NavigationLink для NavigationStack
                                     NavigationLink(destination: TourDetailsView(route: r, source: .explore)) {
                                         ExploreCard(route: r)
                                     }

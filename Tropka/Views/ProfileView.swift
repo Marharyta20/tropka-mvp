@@ -236,7 +236,7 @@ struct SavedRouteMapScreen: View {
         RouteMapView(vm: vm)
             .navigationTitle(title)
             .onAppear {
-                // если координаты ещё не подгружены – грузим всю модель
+                // Coordinates not loaded yet — fetch the whole model
                 if vm.stops.isEmpty {
                     Task { await vm.load(routeID: routeID) }
                 }

@@ -16,10 +16,10 @@ final class AuthService {
         let response = try await supabase.auth.signUp(email: email, password: password)
         let user = response.user
 
-        // Email деликатно не хранится в public.users: он живёт в auth.users и
-        // доступен клиенту как supabase.auth.currentUser?.email. Благодаря этому
-        // таблица профилей может быть открыта на чтение всем залогиненным
-        // (нужно, чтобы показывать автора отзыва) без утечки адресов.
+        // Email is deliberately not stored in public.users: it lives in auth.users
+        // and is reachable client-side as supabase.auth.currentUser?.email. Keeping
+        // it out is what lets the profile table stay readable by every signed-in
+        // user (needed to show a review's author) without leaking addresses.
         struct UserInsert: Encodable {
             let id: String
             let fullName: String

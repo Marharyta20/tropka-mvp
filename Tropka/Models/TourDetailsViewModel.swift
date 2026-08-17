@@ -14,7 +14,7 @@ final class TourDetailsViewModel: ObservableObject {
     @Published var isSaved = false
     @Published var myReview: UserReview? = nil
 
-    // ✅ ВАЖНО для Navigation v3: храним NavigationRoutes, а не Route/RouteResponse
+    // Navigation v3 needs NavigationRoutes here, not Route/RouteResponse.
     @Published var navigationRoutes: NavigationRoutes?
 
     private let saveSvc = SavedRoutesService()
@@ -83,7 +83,7 @@ final class TourDetailsViewModel: ObservableObject {
         try await SupabaseService.shared.fetchStops(for: routeID)
     }
 
-    // ✅ Генерируем маршруты так, как ожидает Navigation SDK v3 (через routingProvider)
+    // Builds routes the way Navigation SDK v3 expects them — via routingProvider.
     func buildWalkingRoute() async {
         let waypoints = stops.map { Waypoint(coordinate: $0.location) }
         guard waypoints.count >= 2 else { return }
@@ -98,7 +98,7 @@ final class TourDetailsViewModel: ObservableObject {
 
             self.navigationRoutes = result
 
-            // для отрисовки линии на карте (оставляем как у тебя)
+            // Used to draw the route line on the map.
             if let coords = result.mainRoute.route.shape?.coordinates {
                 self.routeCoords = coords
             }

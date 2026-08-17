@@ -13,7 +13,6 @@ struct LoginView: View {
                 .padding(.bottom, 20)
 
             if isSignUpMode {
-                // Привязка к fullName
                 TextField("Full Name", text: $authVM.fullName)
                     .textFieldStyle(.roundedBorder)
                     .autocapitalization(.words)
