@@ -9,6 +9,9 @@ struct TourRoute: Identifiable, Equatable, Codable {
     /// nil when the query did not ask for `users(...)`.
     let authorName: String?
     let title: String
+    /// Long-form text about the route. Surfaced behind a control on the detail
+    /// screen rather than inline, so the header stays scannable.
+    let description: String?
     let status: RouteStatus
     let duration: Int       // minutes
     let rating: Double
@@ -41,6 +44,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         case authorUID   = "author_uid"
         case author      = "users"
         case title
+        case description
         case status
         case duration
         case rating
@@ -55,6 +59,9 @@ struct TourRoute: Identifiable, Equatable, Codable {
         id          = try c.decode(String.self, forKey: .id)
         authorUID   = (try? c.decodeIfPresent(String.self, forKey: .authorUID)) ?? ""
         title       = try c.decode(String.self, forKey: .title)
+        let rawDescription = (try? c.decodeIfPresent(String.self, forKey: .description))?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        description = (rawDescription?.isEmpty == false) ? rawDescription : nil
         // Older queries that don't select status still decode; treat them as public.
         status      = (try? c.decodeIfPresent(RouteStatus.self, forKey: .status)) ?? .public
         duration    = (try? c.decodeIfPresent(Int.self, forKey: .duration)) ?? 0
@@ -79,6 +86,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         try c.encode(id, forKey: .id)
         try c.encode(authorUID, forKey: .authorUID)
         try c.encode(title, forKey: .title)
+        try c.encodeIfPresent(description, forKey: .description)
         try c.encode(status, forKey: .status)
         try c.encode(duration, forKey: .duration)
         try c.encode(rating, forKey: .rating)

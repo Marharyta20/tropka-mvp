@@ -32,6 +32,7 @@ struct RouteEditorView: View {
     @StateObject private var draftStore = RouteDraftStore.shared
 
     @State private var title = ""
+    @State private var routeDescription = ""
     @State private var status: RouteStatus = .draft
     @State private var tags: [String] = []
     @State private var newTag = ""
@@ -111,8 +112,16 @@ struct RouteEditorView: View {
     // MARK: - Sections
 
     private var detailsSection: some View {
-        Section("Route") {
+        Section {
             TextField("Title", text: $title)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Description")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                TextEditor(text: $routeDescription)
+                    .frame(minHeight: 110)
+            }
 
             HStack {
                 TextField("Add tag", text: $newTag)
@@ -145,6 +154,11 @@ struct RouteEditorView: View {
                     .padding(.vertical, 2)
                 }
             }
+        } header: {
+            Text("Route")
+        } footer: {
+            Text("The description sits behind the About button on the route screen, "
+                 + "so it can be as long as it needs to be.")
         }
     }
 
@@ -271,6 +285,7 @@ struct RouteEditorView: View {
             do {
                 let loaded = try await RouteEditorService().fetchForEditing(routeID: routeID)
                 title = loaded.title
+                routeDescription = loaded.description ?? ""
                 status = loaded.status
                 tags = loaded.tags
                 thumbnailURL = loaded.thumbnailURL
@@ -298,6 +313,7 @@ struct RouteEditorView: View {
         defer { isSaving = false }
 
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanDescription = routeDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         let service = RouteEditorService()
 
         do {
@@ -306,12 +322,14 @@ struct RouteEditorView: View {
                 "total_minutes": totalMinutes,
                 "tags_count": tags.count,
                 "has_cover": thumbnailURL != nil,
+                "has_description": !cleanDescription.isEmpty,
                 "status": status.rawValue
             ]
 
             switch mode {
             case .create:
                 let id = try await service.createRoute(title: cleanTitle,
+                                                       description: cleanDescription.isEmpty ? nil : cleanDescription,
                                                        status: status,
                                                        tags: tags,
                                                        thumbnailURL: thumbnailURL,
@@ -322,6 +340,7 @@ struct RouteEditorView: View {
             case let .edit(routeID):
                 try await service.updateRoute(routeID: routeID,
                                               title: cleanTitle,
+                                              description: cleanDescription.isEmpty ? nil : cleanDescription,
                                               status: status,
                                               tags: tags,
                                               thumbnailURL: thumbnailURL,

@@ -20,6 +20,7 @@ struct RouteEditorService {
     private struct RouteInsert: Encodable {
         let authorUid: String
         let title: String
+        let description: String?
         let status: RouteStatus
         let tags: [String]
         let thumbnailUrl: String?
@@ -27,7 +28,7 @@ struct RouteEditorService {
 
         enum CodingKeys: String, CodingKey {
             case authorUid    = "author_uid"
-            case title, status, tags
+            case title, description, status, tags
             case thumbnailUrl = "thumbnail_url"
             case stopsCount   = "stops_count"
         }
@@ -35,13 +36,14 @@ struct RouteEditorService {
 
     private struct RouteUpdate: Encodable {
         let title: String
+        let description: String?
         let status: RouteStatus
         let tags: [String]
         let thumbnailUrl: String?
         let stopsCount: Int
 
         enum CodingKeys: String, CodingKey {
-            case title, status, tags
+            case title, description, status, tags
             case thumbnailUrl = "thumbnail_url"
             case stopsCount   = "stops_count"
         }
@@ -73,6 +75,7 @@ struct RouteEditorService {
     // MARK: - Create
 
     func createRoute(title: String,
+                     description: String?,
                      status: RouteStatus,
                      tags: [String],
                      thumbnailURL: URL?,
@@ -82,6 +85,7 @@ struct RouteEditorService {
         let row = RouteInsert(
             authorUid: uid,
             title: title,
+            description: description,
             status: status,
             tags: tags,
             thumbnailUrl: thumbnailURL?.absoluteString,
@@ -105,12 +109,14 @@ struct RouteEditorService {
 
     func updateRoute(routeID: String,
                      title: String,
+                     description: String?,
                      status: RouteStatus,
                      tags: [String],
                      thumbnailURL: URL?,
                      stops: [DraftStop]) async throws {
         let row = RouteUpdate(
             title: title,
+            description: description,
             status: status,
             tags: tags,
             thumbnailUrl: thumbnailURL?.absoluteString,
@@ -198,7 +204,8 @@ struct RouteEditorService {
     // MARK: - Fetch (for the edit screen)
 
     func fetchForEditing(routeID: String) async throws
-    -> (title: String, status: RouteStatus, tags: [String], thumbnailURL: URL?, stops: [DraftStop]) {
+    -> (title: String, description: String?, status: RouteStatus,
+        tags: [String], thumbnailURL: URL?, stops: [DraftStop]) {
         let route: TourRoute = try await supabase
             .from("routes")
             .select()
@@ -208,7 +215,8 @@ struct RouteEditorService {
             .value
 
         let saved = try await SupabaseService.shared.fetchStops(for: routeID)
-        return (route.title, route.status, route.tags, route.thumbnailURL, saved.map(DraftStop.init(stop:)))
+        return (route.title, route.description, route.status,
+                route.tags, route.thumbnailURL, saved.map(DraftStop.init(stop:)))
     }
 
     // MARK: - Helpers

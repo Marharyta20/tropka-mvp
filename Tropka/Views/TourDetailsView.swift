@@ -14,6 +14,7 @@ struct TourDetailsView: View {
     @State private var showMap         = false
     @State private var showReviewSheet = false
     @State private var showEditor      = false
+    @State private var showDescription = false
 
     /// The route as last read from the database, falling back to what we were
     /// handed. Editing or publishing refreshes vm.route, and the header follows.
@@ -115,6 +116,14 @@ struct TourDetailsView: View {
 
                     // ── Actions ──────────────────────────────────────
                     HStack(spacing: 0) {
+                        if shown.description != nil {
+                            ActionButton(icon: "text.alignleft", label: "About", color: .indigo) {
+                                Analytics.track(.routeDescriptionOpened, ["route_id": route.id])
+                                showDescription = true
+                            }
+                            Divider().frame(height: 36)
+                        }
+
                         if !vm.isLoading && !vm.stops.isEmpty {
                             ActionButton(icon: "map.fill", label: "Map", color: .blue) {
                                 Analytics.track(.routeMapOpened, [
@@ -275,6 +284,9 @@ struct TourDetailsView: View {
         .navigationDestination(isPresented: $showMap) {
             RouteMapView(vm: vm)
         }
+        .sheet(isPresented: $showDescription) {
+            RouteDescriptionSheet(title: shown.title, text: shown.description ?? "")
+        }
         .navigationDestination(isPresented: $showEditor) {
             RouteEditorView(mode: .edit(routeID: route.id)) {
                 Task { await vm.load(routeID: route.id) }
@@ -341,7 +353,8 @@ private struct StopRow: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 4) {
-                    Image(systemName: "clock").font(.caption2)
+                    // No clock glyph here — the "≈ N min" already reads as a duration,
+                    // and the icon just crowded the line.
                     Text("≈ \(stop.timeSpent) min").font(.caption)
                     if let notes = stop.notes, !notes.isEmpty {
                         Text("· \(notes)").font(.caption).lineLimit(1)
@@ -366,6 +379,33 @@ private struct StopRow: View {
             }
         }
         .padding(.leading, 0)
+    }
+}
+
+// MARK: – Description sheet
+
+private struct RouteDescriptionSheet: View {
+    let title: String
+    let text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                Text(text)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.bold()
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
