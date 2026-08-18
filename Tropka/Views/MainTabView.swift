@@ -32,7 +32,7 @@ struct MainTabView: View {
 //                }
 //                .tag(Tab.routes)
 
-            CreatorView()
+            TipsView()
                 .tabItem {
                     Image(systemName: "lightbulb")
                     Text("Tips")

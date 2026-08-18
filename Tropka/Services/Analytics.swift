@@ -151,6 +151,9 @@ extension Analytics {
 
         // Tips
         case tipOpened          = "tip_opened"
+        case tipPageViewed      = "tip_page_viewed"
+        case tipPlaceOpened     = "tip_place_opened"
+        case tipRouteStarted    = "tip_route_started"
 
         // Profile & settings
         case profileTabSwitched = "profile_tab_switched"

@@ -25,6 +25,11 @@ enum RouteEditorMode: Equatable {
 struct RouteEditorView: View {
 
     let mode: RouteEditorMode
+    /// Filled in when the route is started from somewhere that already knows what
+    /// it is about — a tip, for instance. Declared before `onSaved` so existing
+    /// trailing-closure call sites keep binding to it.
+    var prefillTitle: String?
+    var prefillDescription: String?
     /// Called after a successful save so the caller can refresh its list.
     var onSaved: (() -> Void)?
 
@@ -274,9 +279,12 @@ struct RouteEditorView: View {
     private func load() async {
         switch mode {
         case .create:
-            // Pick up anything collected from the map before the editor was opened.
+            // Pick up anything collected before the editor was opened — places
+            // tapped on the map, or every place in a tip.
             guard stops.isEmpty else { return }
             stops = draftStore.drain()
+            if title.isEmpty, let prefillTitle { title = prefillTitle }
+            if routeDescription.isEmpty, let prefillDescription { routeDescription = prefillDescription }
 
         case let .edit(routeID):
             guard stops.isEmpty, title.isEmpty else { return }
