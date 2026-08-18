@@ -155,6 +155,7 @@ extension Analytics {
         case profileTabSwitched = "profile_tab_switched"
         case profileShared      = "profile_shared"
         case settingsSaved      = "settings_saved"
+        case avatarChanged      = "avatar_changed"
     }
 
     /// Where a route was opened from — lets us compare Explore vs Map vs Profile as entry points.

@@ -9,7 +9,7 @@ final class SupabaseService {
 
     /// `users(...)` resolves through the routes.author_uid foreign key and gives
     /// us the author's display name in the same round trip.
-    private static let routeColumns = "*, users(full_name, username)"
+    private static let routeColumns = "*, users(full_name, username, photo_url)"
 
     // MARK: - Routes
 

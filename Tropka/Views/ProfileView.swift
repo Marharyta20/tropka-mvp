@@ -18,6 +18,7 @@ struct ProfileView: View {
     @State private var pendingCreatedDelete: TourRoute?
     @State private var showCreatedDeleteConfirm = false
     @State private var showNewRoute = false
+    @State private var showAvatarPicker = false
     
     enum Tab { case saved, created, reviews }
     
@@ -40,6 +41,11 @@ struct ProfileView: View {
             }
             .trackScreen("Profile")
         }
+        .sheet(isPresented: $showAvatarPicker) {
+            AvatarPickerView(current: vm.avatarValue) { avatar in
+                Task { await vm.setAvatar(avatar) }
+            }
+        }
         .sheet(item: $editingReview) { rev in
             EditReviewSheet(draft: rev) { new in
                 Analytics.track(.reviewSubmitted, [
@@ -57,11 +63,18 @@ struct ProfileView: View {
     // MARK: header
     private var header: some View {
         HStack(alignment: .top, spacing: 14) {
-            Image("profile-placeholder")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 72, height: 72)
-                .clipShape(Circle())
+            Button {
+                showAvatarPicker = true
+            } label: {
+                AvatarView(stored: vm.avatarValue, size: 72)
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "pencil.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(.white, Color.accentColor)
+                            .offset(x: 2, y: 2)
+                    }
+            }
+            .buttonStyle(.plain)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(vm.displayName)                // full name

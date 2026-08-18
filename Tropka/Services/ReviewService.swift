@@ -23,8 +23,20 @@ struct ReviewService {
         let comment: String?
         let createdAt: Date
         let routes: RouteTitle?
+        let users: AuthorRow?
 
         struct RouteTitle: Decodable { let title: String }
+
+        struct AuthorRow: Decodable {
+            let fullName: String?
+            let username: String?
+            let photoUrl: String?
+            enum CodingKeys: String, CodingKey {
+                case fullName = "full_name"
+                case username
+                case photoUrl = "photo_url"
+            }
+        }
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -32,18 +44,21 @@ struct ReviewService {
             case userId = "user_id"
             case rating, comment
             case createdAt = "created_at"
-            case routes
+            case routes, users
         }
 
         func toUserReview() -> UserReview {
-            UserReview(
+            let name = users?.fullName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return UserReview(
                 id: id,
                 routeID: routeId,
                 userID: userId,
                 routeTitle: routes?.title ?? "Untitled",
                 rating: rating,
                 text: comment ?? "",
-                createdAt: createdAt
+                createdAt: createdAt,
+                authorName: (name?.isEmpty == false) ? name : users?.username,
+                authorAvatar: users?.photoUrl
             )
         }
     }
@@ -60,6 +75,21 @@ struct ReviewService {
             case userId = "user_id"
             case rating, comment
         }
+    }
+
+    // MARK: - Fetch every review on a route
+
+    /// Public reviews for a route, newest first. Row level security already limits
+    /// this to routes the caller may see, so no extra filtering is needed here.
+    func fetchReviews(routeID: String) async throws -> [UserReview] {
+        let rows: [ReviewRow] = try await supabase
+            .from("reviews")
+            .select("id, route_id, user_id, rating, comment, created_at, users(full_name, username, photo_url)")
+            .eq("route_id", value: routeID)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+        return rows.map { $0.toUserReview() }
     }
 
     // MARK: - Fetch all my reviews

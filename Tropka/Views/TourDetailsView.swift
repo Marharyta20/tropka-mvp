@@ -65,10 +65,14 @@ struct TourDetailsView: View {
 
                             HStack(spacing: 8) {
                                 if let author = shown.authorName {
-                                    Label("by \(author)", systemImage: "person.circle")
-                                        .font(.subheadline)
-                                        .foregroundColor(.white.opacity(0.9))
-                                        .shadow(radius: 2)
+                                    HStack(spacing: 6) {
+                                        AvatarView(stored: shown.authorAvatar, size: 26)
+                                            .overlay(Circle().strokeBorder(.white.opacity(0.7), lineWidth: 1))
+                                        Text("by \(author)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.9))
+                                            .shadow(radius: 2)
+                                    }
                                 }
                                 // Only the author can see a non-public route at all,
                                 // so the badge never leaks anything.
@@ -236,7 +240,31 @@ struct TourDetailsView: View {
                             }
                         }
                     }
-                    .padding(.bottom, 40)
+                    // ── Reviews ──────────────────────────────────────
+                    if !vm.reviews.isEmpty {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack {
+                                Text("Reviews").font(.headline)
+                                Spacer()
+                                Text("\(vm.reviews.count)")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                            .padding(.bottom, 8)
+
+                            ForEach(vm.reviews) { review in
+                                PublicReviewRow(review: review)
+                                if review.id != vm.reviews.last?.id {
+                                    Divider().padding(.leading, 16)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(minLength: 40)
                 }
             }
             .ignoresSafeArea(edges: .top)
@@ -379,6 +407,39 @@ private struct StopRow: View {
             }
         }
         .padding(.leading, 0)
+    }
+}
+
+// MARK: – Public review row
+
+private struct PublicReviewRow: View {
+    let review: UserReview
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            AvatarView(stored: review.authorAvatar, size: 36)
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(review.isMine ? "You" : (review.authorName ?? "Someone"))
+                        .font(.subheadline.bold())
+                    Stars(rating: review.rating)
+                    Spacer(minLength: 0)
+                    Text(review.createdAt.formatted(date: .abbreviated, time: .omitted))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                if !review.text.isEmpty {
+                    Text(review.text)
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 

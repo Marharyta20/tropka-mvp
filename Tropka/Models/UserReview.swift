@@ -12,4 +12,14 @@ struct UserReview: Identifiable {
     var rating: Int             // 1-5
     var text: String            // maps to DB column "comment"
     var createdAt: Date
+
+    // From the users(...) join — only filled when the query asked for it,
+    // i.e. when the review is shown to someone other than its author.
+    var authorName: String? = nil
+    var authorAvatar: String? = nil
+
+    var isMine: Bool {
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return false }
+        return userID.caseInsensitiveCompare(uid) == .orderedSame
+    }
 }

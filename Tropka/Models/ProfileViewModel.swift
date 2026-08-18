@@ -19,6 +19,8 @@ class ProfileViewModel: ObservableObject {
     @Published var handle      = ""
     @Published var city        = ""
     @Published var registrationDate: Date?
+    /// Raw contents of users.photo_url — see Avatar for how it is interpreted.
+    @Published var avatarValue: String?
 
     // Routes saved from other authors
     @Published var routes: [SavedRoute] = []
@@ -61,6 +63,7 @@ class ProfileViewModel: ObservableObject {
         struct UserRow: Decodable {
             let fullName: String?
             let username: String?
+            let photoUrl: String?
             let registrationDate: Date?
             let cities: CityRow?
 
@@ -69,6 +72,7 @@ class ProfileViewModel: ObservableObject {
             enum CodingKeys: String, CodingKey {
                 case fullName = "full_name"
                 case username
+                case photoUrl = "photo_url"
                 case registrationDate = "registration_date"
                 case cities
             }
@@ -77,16 +81,42 @@ class ProfileViewModel: ObservableObject {
         do {
             let row: UserRow = try await supabase
                 .from("users")
-                .select("full_name, username, registration_date, cities(name)")
+                .select("full_name, username, photo_url, registration_date, cities(name)")
                 .eq("id", value: uid)
                 .single()
                 .execute()
                 .value
             displayName      = row.fullName ?? "Unknown User"
             handle           = row.username ?? "user"
+            avatarValue      = row.photoUrl
             city             = row.cities?.name ?? ""
             registrationDate = row.registrationDate
         } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Avatar
+
+    func setAvatar(_ avatar: Avatar) async {
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
+        let previous = avatarValue
+        avatarValue = avatar.storedValue      // optimistic, the grid closes immediately
+
+        struct AvatarUpdate: Encodable {
+            let photoUrl: String
+            enum CodingKeys: String, CodingKey { case photoUrl = "photo_url" }
+        }
+
+        do {
+            try await supabase
+                .from("users")
+                .update(AvatarUpdate(photoUrl: avatar.storedValue))
+                .eq("id", value: uid)
+                .execute()
+            Analytics.track(.avatarChanged, ["avatar": avatar.id])
+        } catch {
+            avatarValue = previous
             errorMessage = error.localizedDescription
         }
     }
@@ -111,7 +141,7 @@ class ProfileViewModel: ObservableObject {
         do {
             let rows: [SavedRouteRow] = try await supabase
                 .from("saved_routes")
-                .select("saved_at, routes(*, users(full_name, username))")
+                .select("saved_at, routes(*, users(full_name, username, photo_url))")
                 .eq("user_id", value: uid)
                 .order("saved_at", ascending: false)
                 .execute()

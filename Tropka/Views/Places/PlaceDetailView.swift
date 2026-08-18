@@ -312,7 +312,10 @@ private struct RelatedRouteRow: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 if let author = route.authorName {
-                    Text("by \(author)").font(.caption2).foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        AvatarView(stored: route.authorAvatar, size: 16)
+                        Text("by \(author)").font(.caption2).foregroundColor(.secondary)
+                    }
                 }
             }
 

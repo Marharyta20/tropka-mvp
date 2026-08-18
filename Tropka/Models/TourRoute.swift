@@ -8,6 +8,8 @@ struct TourRoute: Identifiable, Equatable, Codable {
     /// Display name of the author, from the embedded users row.
     /// nil when the query did not ask for `users(...)`.
     let authorName: String?
+    /// Raw users.photo_url of the author — feed it straight to AvatarView.
+    let authorAvatar: String?
     let title: String
     /// Long-form text about the route. Surfaced behind a control on the detail
     /// screen rather than inline, so the header stays scannable.
@@ -28,14 +30,16 @@ struct TourRoute: Identifiable, Equatable, Codable {
 
     // MARK: Codable
 
-    /// Shape of the embedded `users(full_name, username)` join.
+    /// Shape of the embedded `users(full_name, username, photo_url)` join.
     private struct AuthorRow: Decodable {
         let fullName: String?
         let username: String?
+        let photoUrl: String?
 
         enum CodingKeys: String, CodingKey {
             case fullName = "full_name"
             case username
+            case photoUrl = "photo_url"
         }
     }
 
@@ -73,6 +77,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         thumbnailURL = urlStr.flatMap(URL.init)
 
         let author = try? c.decodeIfPresent(AuthorRow.self, forKey: .author)
+        authorAvatar = author?.photoUrl
         let fullName = author?.fullName?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let fullName, !fullName.isEmpty {
             authorName = fullName
@@ -94,7 +99,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         try c.encode(stopsCount, forKey: .stopsCount)
         try c.encode(tags, forKey: .tags)
         try c.encodeIfPresent(thumbnailURL?.absoluteString, forKey: .thumbnailURL)
-        // authorName is derived from a join, never written back.
+        // authorName and authorAvatar are derived from a join, never written back.
     }
 
     static func == (lhs: TourRoute, rhs: TourRoute) -> Bool {

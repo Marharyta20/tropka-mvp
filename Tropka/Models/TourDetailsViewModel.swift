@@ -16,6 +16,8 @@ final class TourDetailsViewModel: ObservableObject {
     @Published var routeCoords: [CLLocationCoordinate2D] = []
     @Published var isSaved = false
     @Published var myReview: UserReview? = nil
+    /// Every review on this route, author included — shown to everyone.
+    @Published var reviews: [UserReview] = []
 
     // Navigation v3 needs NavigationRoutes here, not Route/RouteResponse.
     @Published var navigationRoutes: NavigationRoutes?
@@ -30,6 +32,7 @@ final class TourDetailsViewModel: ObservableObject {
         errorMsg = nil
 
         await reloadRoute(routeID: routeID)
+        await loadReviews(routeID: routeID)
 
         async let savedTask = saveSvc.isSaved(routeID: routeID)
         async let reviewTask = fetchMyReview(routeID: routeID)
@@ -50,6 +53,10 @@ final class TourDetailsViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    func loadReviews(routeID: String) async {
+        reviews = (try? await reviewSvc.fetchReviews(routeID: routeID)) ?? []
     }
 
     func reloadRoute(routeID: String) async {
@@ -89,8 +96,9 @@ final class TourDetailsViewModel: ObservableObject {
     func saveReview(_ review: UserReview) async {
         do {
             self.myReview = try await reviewSvc.upsert(review: review)
+            await loadReviews(routeID: review.routeID)
         } catch {
-            print("Error saving review: \(error)")
+            errorMsg = error.localizedDescription
         }
     }
 

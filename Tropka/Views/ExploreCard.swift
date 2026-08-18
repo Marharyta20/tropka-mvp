@@ -66,9 +66,12 @@ struct ExploreCard: View {
 
             //–– Author
             if let author = route.authorName {
-                Label("by \(author)", systemImage: "person.circle")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    AvatarView(stored: route.authorAvatar, size: 22)
+                    Text("by \(author)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             
             //–– Meta (rating • duration)

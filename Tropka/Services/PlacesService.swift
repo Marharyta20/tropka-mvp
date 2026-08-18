@@ -145,7 +145,7 @@ final class PlacesService {
 
         let rows: [RouteStopRow] = try await supabase
             .from("route_stops")
-            .select("routes(*, users(full_name, username))")
+            .select("routes(*, users(full_name, username, photo_url))")
             .eq("place_id", value: placeID)
             .execute()
             .value
