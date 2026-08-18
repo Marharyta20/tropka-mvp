@@ -1,5 +1,5 @@
-import SwiftUI
 import Combine
+import SwiftUI
 
 @MainActor
 final class RouteCardViewModel: ObservableObject {
@@ -19,7 +19,26 @@ final class RouteCardViewModel: ObservableObject {
 
     func save() async {
         guard !isSaved else { return }
-        isSaved = true
-        try? await saveSvc.save(routeID: route.id)
+        await toggle()
+    }
+
+    /// Flips the saved state and returns the state it ended up in, so the caller
+    /// can report the right thing to the user even if the request failed.
+    /// The UI updates first and rolls back on error — waiting for the network
+    /// makes the bookmark feel broken.
+    @discardableResult
+    func toggle() async -> Bool {
+        let wasSaved = isSaved
+        isSaved = !wasSaved
+        do {
+            if wasSaved {
+                try await saveSvc.remove(routeID: route.id)
+            } else {
+                try await saveSvc.save(routeID: route.id)
+            }
+        } catch {
+            isSaved = wasSaved
+        }
+        return isSaved
     }
 }
