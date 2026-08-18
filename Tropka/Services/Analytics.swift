@@ -136,6 +136,7 @@ extension Analytics {
         // Places catalogue
         case placeOpened            = "place_opened"
         case placesSearched         = "places_searched"
+        case categoryOpened         = "category_opened"
         case placeLinkOpened        = "place_link_opened"
         case exploreSectionSwitched = "explore_section_switched"
 

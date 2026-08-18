@@ -122,9 +122,9 @@ struct ExploreCard: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 18)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 6, y: 3)
+                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
         )
         .toast(isPresented: $showToast) {
             Text("Route added")

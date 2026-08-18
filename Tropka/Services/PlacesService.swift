@@ -11,6 +11,15 @@ struct PlacePick: Identifiable, Equatable {
     let photoURL: URL?
 }
 
+// MARK: - CategoryCount
+
+/// How many places sit in each category, for the Explore home tiles.
+struct CategoryCount: Identifiable, Equatable {
+    let category: PlaceCategory
+    let count: Int
+    var id: Int { category.rawValue }
+}
+
 // MARK: - PlacesService
 
 /// Read access to the curated `places` table.
@@ -151,6 +160,36 @@ final class PlacesService {
             .value
 
         return rows.compactMap(\.routes)
+    }
+
+    // MARK: - Category counts
+
+    /// Reads the `place_category_counts` view — one round trip instead of a
+    /// count query per category.
+    func categoryCounts() async throws -> [CategoryCount] {
+        struct CountRow: Decodable {
+            let categoryId: Int
+            let placeCount: Int
+            enum CodingKeys: String, CodingKey {
+                case categoryId = "category_id"
+                case placeCount = "place_count"
+            }
+        }
+
+        let rows: [CountRow] = try await supabase
+            .from("place_category_counts")
+            .select("category_id, place_count")
+            .execute()
+            .value
+
+        return rows
+            .compactMap { row -> CategoryCount? in
+                guard let category = PlaceCategory(rawValue: row.categoryId),
+                      category != .other
+                else { return nil }
+                return CategoryCount(category: category, count: row.placeCount)
+            }
+            .sorted { $0.count > $1.count }
     }
 
     // MARK: - Mapping

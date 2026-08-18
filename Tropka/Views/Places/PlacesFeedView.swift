@@ -70,8 +70,7 @@ struct PlacesFeedView: View {
     @State private var showFilters = false
 
     var body: some View {
-        VStack(spacing: 10) {
-            searchBar
+        VStack(spacing: 6) {
             filterRow
 
             if let errorMessage = vm.errorMessage, vm.places.isEmpty {
@@ -99,41 +98,21 @@ struct PlacesFeedView: View {
 
     // MARK: Pieces
 
-    private var searchBar: some View {
-        HStack(spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-                TextField("Search places", text: $vm.query)
-                    .textFieldStyle(.plain)
-                if !vm.query.isEmpty {
-                    Button { vm.query = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
-                    }
-                }
-            }
-            .padding(10)
-            .background(Color(.systemGray6))
-            .cornerRadius(8)
-
-            Menu {
-                Picker("Sort", selection: $vm.sort) {
-                    ForEach(PlaceSort.allCases) { option in
-                        Label(option.title, systemImage: option.icon).tag(option)
-                    }
-                }
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-                    .padding(10)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-            }
-        }
-        .padding(.horizontal, 16)
-    }
-
     private var filterRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                Menu {
+                    Picker("Sort", selection: $vm.sort) {
+                        ForEach(PlaceSort.allCases) { option in
+                            Label(option.title, systemImage: option.icon).tag(option)
+                        }
+                    }
+                } label: {
+                    Label(vm.sort.title, systemImage: "arrow.up.arrow.down")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+
                 Button {
                     showFilters = true
                 } label: {
@@ -157,12 +136,13 @@ struct PlacesFeedView: View {
                 }
             }
             .padding(.horizontal, 16)
+            .padding(.top, 4)
         }
     }
 
     private var list: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
+            LazyVStack(spacing: 10) {
                 ForEach(vm.visible) { place in
                     NavigationLink {
                         PlaceDetailView(placeID: place.id, preloaded: place)
@@ -271,7 +251,7 @@ struct PlaceCard: View {
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
+                .shadow(color: .black.opacity(0.04), radius: 4, y: 2)
         )
     }
 }
