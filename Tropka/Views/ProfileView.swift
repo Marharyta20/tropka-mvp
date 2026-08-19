@@ -56,21 +56,6 @@ struct ProfileView: View {
                         Image(systemName: "gearshape")
                     }
                 }
-                // Creating a route belongs in the bar, not as a banner pushing the
-                // list down the screen.
-                if selectedTab == .created {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            Analytics.track(.routeEditorOpened, [
-                                "mode": "create",
-                                "draft_size": RouteDraftStore.shared.count
-                            ])
-                            showNewRoute = true
-                        } label: {
-                            Image(systemName: "plus")
-                        }
-                    }
-                }
             }
             .navigationDestination(isPresented: $showSettings) {
                 SettingsView(profileVM: vm)
@@ -259,13 +244,6 @@ struct ProfileView: View {
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                 .listRowSeparator(.hidden)
-                .simultaneousGesture(TapGesture().onEnded {
-                    Analytics.track(.routeOpened, [
-                        "route_id": item.route.id,
-                        "route_title": item.route.title,
-                        "source": Analytics.Source.profile.rawValue
-                    ])
-                })
                 .swipeActions {
                     Button(role: .destructive) {
                         pendingDelete = item
@@ -306,6 +284,23 @@ struct ProfileView: View {
 
     private var createdList: some View {
         List {
+            // Lives inside the list it adds to, rather than in the navigation bar
+            // where it would sit on every tab and belong to none of them.
+            if !vm.createdRoutes.isEmpty {
+                Button {
+                    Analytics.track(.routeEditorOpened, [
+                        "mode": "create",
+                        "draft_size": RouteDraftStore.shared.count
+                    ])
+                    showNewRoute = true
+                } label: {
+                    newRouteRow
+                }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 10, leading: 20, bottom: 6, trailing: 20))
+                .listRowSeparator(.hidden)
+            }
+
             ForEach(vm.createdRoutes) { route in
                 NavigationLink {
                     TourDetailsView(route: route, source: .profile)
@@ -314,15 +309,6 @@ struct ProfileView: View {
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                 .listRowSeparator(.hidden)
-                .simultaneousGesture(TapGesture().onEnded {
-                    Analytics.track(.routeOpened, [
-                        "route_id": route.id,
-                        "route_title": route.title,
-                        "status": route.status.rawValue,
-                        "source": Analytics.Source.profile.rawValue,
-                        "is_own": true
-                    ])
-                })
                 .swipeActions {
                     Button(role: .destructive) {
                         pendingCreatedDelete = route
@@ -361,6 +347,36 @@ struct ProfileView: View {
         }
         .task { await vm.fetchCreatedRoutes() }
         .refreshable { await vm.fetchCreatedRoutes() }
+    }
+
+    private var newRouteRow: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "plus")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 40, height: 40)
+                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("New route")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.primary)
+                Text(RouteDraftStore.shared.isEmpty
+                     ? "Pick places and put them in order"
+                     : "\(RouteDraftStore.shared.count) place\(RouteDraftStore.shared.count == 1 ? "" : "s") waiting from the map")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color(.systemGray4), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+        )
     }
 
     // MARK: - Reviews
@@ -488,6 +504,11 @@ struct SavedRouteMapScreen: View {
         RouteMapView(vm: vm)
             .navigationTitle(title)
             .onAppear {
+                Analytics.track(.routeOpened, [
+                    "route_id": routeID,
+                    "route_title": title,
+                    "source": Analytics.Source.profile.rawValue
+                ])
                 if vm.stops.isEmpty {
                     Task { await vm.load(routeID: routeID) }
                 }

@@ -173,13 +173,23 @@ struct MapRepresentable: UIViewRepresentable {
         // MARK: Camera
 
         func fitRoute(on mapView: MapboxMaps.MapView, animated: Bool) {
-            let line = parent.routeCoords.isEmpty ? parent.stops.map(\.location) : parent.routeCoords
+            // Frame the stops themselves, not just the walking line: the line runs
+            // between them, so fitting it alone can leave the first and last pins
+            // (and their name tags) hanging off the edge.
+            let line = parent.stops.map(\.location) + parent.routeCoords
+
+            // The map draws edge to edge, so the padding has to account for what sits
+            // on top of it: the title bar above, and below — the stop carousel, the
+            // navigation button and the tab bar.
+            let padding = UIEdgeInsets(top: 130, left: 52, bottom: 300, right: 52)
+
             guard !line.isEmpty,
                   let camera = try? mapView.mapboxMap.camera(
                       for: line,
                       camera: CameraOptions(bearing: 0, pitch: 0),
-                      coordinatesPadding: UIEdgeInsets(top: 80, left: 40, bottom: 220, right: 40),
-                      maxZoom: nil,
+                      coordinatesPadding: padding,
+                      // A two-stop route should not slam into street level.
+                      maxZoom: 15.5,
                       offset: nil
                   )
             else { return }
