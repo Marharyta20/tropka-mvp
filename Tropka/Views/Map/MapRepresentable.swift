@@ -16,8 +16,15 @@ struct MapRepresentable: UIViewRepresentable {
 
     // MARK: - Make
 
+    /// Warsaw, so the first frame is a city rather than the whole planet.
+    private static let fallbackCenter = CLLocationCoordinate2D(latitude: 52.2319, longitude: 21.0067)
+
     func makeUIView(context: Context) -> MapboxMaps.MapView {
-        let mapView = MapboxMaps.MapView(frame: .zero, mapInitOptions: MapInitOptions(styleURI: .standard))
+        let options = MapInitOptions(
+            cameraOptions: CameraOptions(center: Self.fallbackCenter, zoom: 12),
+            styleURI: .standard
+        )
+        let mapView = MapboxMaps.MapView(frame: .zero, mapInitOptions: options)
 
         mapView.ornaments.scaleBarView.isHidden = true
         mapView.ornaments.compassView.isHidden = false
@@ -76,6 +83,10 @@ struct MapRepresentable: UIViewRepresentable {
         private var pointManager: PointAnnotationManager?
         private var polylineManager: PolylineAnnotationManager?
         private var lastDrawnSignature = ""
+        /// The route the camera was last framed around. Refitting happens when the
+        /// route itself changes, not on every SwiftUI update — that is what used to
+        /// yank the camera back mid-gesture.
+        private var lastFittedSignature = ""
 
         init(_ parent: MapRepresentable) {
             self.parent = parent
@@ -132,6 +143,15 @@ struct MapRepresentable: UIViewRepresentable {
             }
 
             let line = parent.routeCoords.isEmpty ? parent.stops.map(\.location) : parent.routeCoords
+
+            // Stops land first, the walking path a moment later; frame both times.
+            let routeSignature = "\(parent.stops.map(\.id).joined())|\(parent.routeCoords.count)"
+            if !line.isEmpty, routeSignature != lastFittedSignature {
+                let isFirstFit = lastFittedSignature.isEmpty
+                lastFittedSignature = routeSignature
+                fitRoute(on: mapView, animated: !isFirstFit)
+            }
+
             guard line.count > 1 else {
                 polylineManager.annotations = []
                 return

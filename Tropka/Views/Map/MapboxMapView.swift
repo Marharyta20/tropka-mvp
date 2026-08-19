@@ -24,7 +24,7 @@ struct MapboxMapView: UIViewRepresentable {
     /// Bumped when a search settles, so the camera can go where the matches are.
     var focusTrigger: Int = 0
 
-    /// Warsaw, so the first frame is a city rather than a globe.
+    /// The app is about Warsaw, so Warsaw is where the map opens.
     private static let fallbackCenter = CLLocationCoordinate2D(latitude: 52.2319, longitude: 21.0067)
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -64,7 +64,7 @@ struct MapboxMapView: UIViewRepresentable {
 
     // MARK: - Coordinator
 
-    final class Coordinator {
+    final class Coordinator: NSObject, CLLocationManagerDelegate {
         var onPinTapped: ((Place) -> Void)?
 
         private weak var mapView: MapboxMaps.MapView?
@@ -73,6 +73,16 @@ struct MapboxMapView: UIViewRepresentable {
         private var places: [Place] = []
         private var lastRecenterTrigger = 0
         private var lastFocusTrigger = 0
+
+        /// Following the user is only useful where there is something to see. Until
+        /// the catalogue covers more than one city, a visitor opening the app from
+        /// San Francisco should get Warsaw, not an empty map of California — while
+        /// someone already in town gets their own street. The locate button
+        /// overrides this either way.
+        private let locationManager = CLLocationManager()
+        private static let warsaw = CLLocation(latitude: 52.2319, longitude: 21.0067)
+        private static let cityRadius: CLLocationDistance = 60_000
+        private var hasDecidedOpeningCamera = false
 
         /// The chosen set only changes with zoom, so it is worth keeping.
         private var cachedSelection: [Selection] = []
@@ -104,18 +114,50 @@ struct MapboxMapView: UIViewRepresentable {
                 self?.render()
             }.store(in: &cancelables)
 
+            // Ask for a fix once; the delegate decides whether the camera moves.
+            locationManager.delegate = self
+            locationManager.requestWhenInUseAuthorization()
+            locationManager.requestLocation()
+        }
+
+        // MARK: Location
+
+        func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+            guard !hasDecidedOpeningCamera, let location = locations.last else { return }
+            hasDecidedOpeningCamera = true
+            // Somewhere else entirely: keep the opening view on Warsaw.
+            guard location.distance(from: Self.warsaw) <= Self.cityRadius else { return }
             // ~1.3 km across a phone screen: close enough to recognise the street
-            // you are on, wide enough to see where the neighbourhood goes. The
-            // previous 14.5 showed about 800 m, which read as "already zoomed in".
-            let follow = mapView.viewport.makeFollowPuckViewportState(
+            // you are on, wide enough to see where the neighbourhood goes.
+            follow(zoom: 13.8)
+        }
+
+        func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+            // No fix — Warsaw stays. Nothing is marked decided, so a later
+            // permission grant still gets a chance to move the camera.
+        }
+
+        func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+            switch manager.authorizationStatus {
+            case .authorizedWhenInUse, .authorizedAlways:
+                guard !hasDecidedOpeningCamera else { return }
+                manager.requestLocation()
+            default:
+                break
+            }
+        }
+
+        private func follow(zoom: CGFloat) {
+            guard let mapView else { return }
+            let state = mapView.viewport.makeFollowPuckViewportState(
                 options: FollowPuckViewportStateOptions(
                     padding: UIEdgeInsets(top: 120, left: 0, bottom: 220, right: 0),
-                    zoom: 13.8,
+                    zoom: zoom,
                     bearing: .constant(0),
                     pitch: 0
                 )
             )
-            mapView.viewport.transition(to: follow)
+            mapView.viewport.transition(to: state)
         }
 
         // MARK: Style
@@ -145,19 +187,13 @@ struct MapboxMapView: UIViewRepresentable {
         }
 
         func recenterIfNeeded(trigger: Int) {
-            guard trigger != lastRecenterTrigger, let mapView else { return }
+            guard trigger != lastRecenterTrigger else { return }
             lastRecenterTrigger = trigger
-            // Pressing the button is a deliberate "where am I", so it lands closer
-            // than the opening view.
-            let follow = mapView.viewport.makeFollowPuckViewportState(
-                options: FollowPuckViewportStateOptions(
-                    padding: UIEdgeInsets(top: 120, left: 0, bottom: 220, right: 0),
-                    zoom: 14.4,
-                    bearing: .constant(0),
-                    pitch: 0
-                )
-            )
-            mapView.viewport.transition(to: follow)
+            // Pressing the button is a deliberate "where am I" — it goes there
+            // whatever city that turns out to be, and lands closer than the opening
+            // view.
+            hasDecidedOpeningCamera = true
+            follow(zoom: 14.4)
         }
 
         /// Filtering the pins is not enough: a search for "Warsaw Uprising Museum"

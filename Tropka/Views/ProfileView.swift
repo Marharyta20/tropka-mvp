@@ -1,16 +1,16 @@
+import SDWebImageSwiftUI
 import SwiftUI
 
-/// Main profile screen
-
+/// The profile: who you are, and the three piles of things you own — saved routes,
+/// routes you wrote, reviews you left.
 struct ProfileView: View {
-    
-    // MARK: state & VM
+
     @StateObject private var vm = ProfileViewModel()
-    
-    @State private var showSettings  = false
+
+    @State private var showSettings = false
     @State private var selectedTab: Tab = .saved
     @Namespace private var underlineNS
-    
+
     @State private var pendingDelete: SavedRoute?
     @State private var showDeleteConfirm = false
     @State private var editingReview: UserReview?
@@ -19,25 +19,66 @@ struct ProfileView: View {
     @State private var showCreatedDeleteConfirm = false
     @State private var showNewRoute = false
     @State private var showAvatarPicker = false
-    
-    enum Tab { case saved, created, reviews }
-    
-    
-    // MARK: body
+
+    enum Tab: CaseIterable {
+        case saved, created, reviews
+
+        var title: String {
+            switch self {
+            case .saved:   return "Saved"
+            case .created: return "Created"
+            case .reviews: return "Reviews"
+            }
+        }
+    }
+
+    // MARK: - Body
+
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
                 header
+                    .padding(.horizontal, 20)
                 actionRow
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
                 tabBar
+                    .padding(.top, 18)
                 tabContent
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .navigationTitle("")
+            .padding(.top, 4)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                }
+                // Creating a route belongs in the bar, not as a banner pushing the
+                // list down the screen.
+                if selectedTab == .created {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            Analytics.track(.routeEditorOpened, [
+                                "mode": "create",
+                                "draft_size": RouteDraftStore.shared.count
+                            ])
+                            showNewRoute = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+                }
+            }
             .navigationDestination(isPresented: $showSettings) {
                 SettingsView(profileVM: vm)
+            }
+            .navigationDestination(isPresented: $showNewRoute) {
+                RouteEditorView(mode: .create) {
+                    Task { await vm.fetchCreatedRoutes() }
+                }
             }
             .trackScreen("Profile")
         }
@@ -46,130 +87,178 @@ struct ProfileView: View {
                 Task { await vm.setAvatar(avatar) }
             }
         }
-        .sheet(item: $editingReview) { rev in
-            EditReviewSheet(draft: rev) { new in
+        .sheet(item: $editingReview) { review in
+            EditReviewSheet(draft: review) { updated in
                 Analytics.track(.reviewSubmitted, [
-                    "route_id": new.routeID,
-                    "rating": new.rating,
-                    "text_length": new.text.count,
+                    "route_id": updated.routeID,
+                    "rating": updated.rating,
+                    "text_length": updated.text.count,
                     "is_edit": true,
                     "source": Analytics.Source.profile.rawValue
                 ])
-                Task { await vm.update(review: new) }
+                Task { await vm.update(review: updated) }
             }
         }
     }
-    
-    // MARK: header
+
+    // MARK: - Header
+
     private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .center, spacing: 16) {
             Button {
                 showAvatarPicker = true
             } label: {
-                AvatarView(stored: vm.avatarValue, size: 72)
+                AvatarView(stored: vm.avatarValue, size: 78)
                     .overlay(alignment: .bottomTrailing) {
                         Image(systemName: "pencil.circle.fill")
-                            .font(.system(size: 20))
+                            .font(.system(size: 22))
                             .foregroundStyle(.white, Color.accentColor)
                             .offset(x: 2, y: 2)
                     }
             }
             .buttonStyle(.plain)
-            
-            VStack(alignment: .leading, spacing: 4) {
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(vm.isLoadingProfile ? "…" : (vm.displayName.isEmpty ? "No name yet" : vm.displayName))
-                    .font(.title3).bold()
-                Text("@\(vm.handle) · \(vm.city)")
+                    .font(.title2.bold())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Text(subtitle)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
+
                 if let joined = vm.registrationDate {
-                    Text("Joined \(joined.formatted(date: .long, time: .omitted))")
+                    Text("Joined \(joined.formatted(.dateTime.month(.wide).year()))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
-            Spacer()
+
+            Spacer(minLength: 0)
         }
     }
-    
-    // MARK: buttons row
+
+    private var subtitle: String {
+        let handle = vm.handle.isEmpty ? "" : "@\(vm.handle)"
+        return [handle, vm.city].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
     private var actionRow: some View {
         HStack(spacing: 12) {
-            Button("Edit profile") {
+            Button {
                 showSettings = true
+            } label: {
+                Text("Edit profile")
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
             }
             .buttonStyle(.bordered)
-            .frame(maxWidth: .infinity)
+            .buttonBorderShape(.capsule)
 
-            ShareLink("Share profile", item: shareProfileText)
-                .buttonStyle(.bordered)
-                .frame(maxWidth: .infinity)
-                .simultaneousGesture(TapGesture().onEnded {
-                    Analytics.track(.profileShared)
-                })
+            ShareLink(item: shareProfileText) {
+                Label("Share", systemImage: "square.and.arrow.up")
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .simultaneousGesture(TapGesture().onEnded {
+                Analytics.track(.profileShared)
+            })
         }
     }
 
-    // Plain-text invite for now — swap in a real App Store / profile URL once one exists.
+    /// Plain-text invite for now — swap in a real App Store / profile URL once one exists.
     private var shareProfileText: String {
         "Check out my profile on Tropka! I'm @\(vm.handle) 🗺️"
     }
-    
-    // MARK: underline tab bar
-    private var tabBar: some View {
-        HStack(spacing: 24) {
-            tabButton(title: "Saved",   tab: .saved)
-            tabButton(title: "Created", tab: .created)
-            tabButton(title: "Reviews", tab: .reviews)
-            Spacer()
+
+    // MARK: - Tabs
+
+    /// Counts live in the tabs themselves: the old screen made you open each one to
+    /// find out whether there was anything inside.
+    private func count(for tab: Tab) -> Int {
+        switch tab {
+        case .saved:   return vm.routes.count
+        case .created: return vm.createdRoutes.count
+        case .reviews: return vm.myReviews.count
         }
     }
-    private func tabButton(title: String, tab: Tab) -> some View {
-        Button {
-            Analytics.track(.profileTabSwitched, ["tab": String(describing: tab)])
-            withAnimation(.easeInOut) { selectedTab = tab }
-        } label: {
-            VStack(spacing: 4) {
-                Text(title)
-                    .fontWeight(selectedTab == tab ? .semibold : .regular)
-                    .foregroundColor(.primary)
-                if selectedTab == tab {
-                    Capsule()
-                        .frame(height: 2)
-                        .matchedGeometryEffect(id: "underline", in: underlineNS)
-                } else {
-                    Color.clear.frame(height: 2)
+
+    private var tabBar: some View {
+        HStack(spacing: 0) {
+            ForEach(Tab.allCases, id: \.self) { tab in
+                Button {
+                    Analytics.track(.profileTabSwitched, ["tab": String(describing: tab)])
+                    withAnimation(.easeInOut(duration: 0.2)) { selectedTab = tab }
+                } label: {
+                    VStack(spacing: 8) {
+                        HStack(spacing: 5) {
+                            Text(tab.title)
+                                .font(.subheadline)
+                                .fontWeight(selectedTab == tab ? .semibold : .regular)
+                                .foregroundColor(selectedTab == tab ? .primary : .secondary)
+                            if count(for: tab) > 0 {
+                                Text("\(count(for: tab))")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(selectedTab == tab ? .white : .secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        Capsule().fill(selectedTab == tab
+                                                       ? Color.accentColor
+                                                       : Color(.systemGray5))
+                                    )
+                            }
+                        }
+
+                        Group {
+                            if selectedTab == tab {
+                                Capsule()
+                                    .fill(Color.primary)
+                                    .frame(height: 2)
+                                    .matchedGeometryEffect(id: "underline", in: underlineNS)
+                            } else {
+                                Color.clear.frame(height: 2)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
         }
-        .buttonStyle(.plain)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
     }
-    
+
     @ViewBuilder
     private var tabContent: some View {
         switch selectedTab {
-
-        case .saved:
-            routesList
-
-        case .created:
-            createdList
-
-        case .reviews:
-            reviewsList
+        case .saved:   savedList
+        case .created: createdList
+        case .reviews: reviewsList
         }
     }
-    
-    // MARK: – Routes list
-    private var routesList: some View {
+
+    // MARK: - Saved
+
+    private var savedList: some View {
         List {
             ForEach(vm.routes) { item in
                 NavigationLink {
-                    SavedRouteMapScreen(routeID: item.route.id,
-                                        title:    item.route.title)
+                    SavedRouteMapScreen(routeID: item.route.id, title: item.route.title)
                 } label: {
-                    ProfileRouteCell(item: item)
+                    RouteRow(route: item.route, caption: savedCaption(item))
                 }
+                .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
+                .listRowSeparator(.hidden)
                 .simultaneousGesture(TapGesture().onEnded {
                     Analytics.track(.routeOpened, [
                         "route_id": item.route.id,
@@ -181,95 +270,91 @@ struct ProfileView: View {
                     Button(role: .destructive) {
                         pendingDelete = item
                         showDeleteConfirm = true
-                    } label: { Label("Remove", systemImage: "trash") }
+                    } label: { Label("Remove", systemImage: "bookmark.slash") }
                 }
             }
         }
         .listStyle(.plain)
         .overlay {
             if vm.routes.isEmpty {
-                Text("No saved routes yet")
-                    .foregroundColor(.secondary)
+                ContentUnavailableView("Nothing saved yet",
+                                       systemImage: "bookmark",
+                                       description: Text("Routes you save from Explore or the map show up here."))
             }
         }
-        .confirmationDialog("Remove this route?",
-                            isPresented: $showDeleteConfirm) {
-            Button("Delete", role: .destructive) {
-                if let r = pendingDelete {
+        .confirmationDialog("Remove this route?", isPresented: $showDeleteConfirm) {
+            Button("Remove", role: .destructive) {
+                if let item = pendingDelete {
                     Analytics.track(.routeUnsaved, [
-                        "route_id": r.route.id,
-                        "route_title": r.route.title,
+                        "route_id": item.route.id,
+                        "route_title": item.route.title,
                         "source": Analytics.Source.profile.rawValue
                     ])
-                    Task { await vm.unsave(routeID: r.route.id) }
+                    Task { await vm.unsave(routeID: item.route.id) }
                 }
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
         }
     }
-    
-    // MARK: – Created routes
-    private var createdList: some View {
-        VStack(spacing: 0) {
-            Button {
-                Analytics.track(.routeEditorOpened, [
-                    "mode": "create",
-                    "draft_size": RouteDraftStore.shared.count
-                ])
-                showNewRoute = true
-            } label: {
-                Label(RouteDraftStore.shared.isEmpty
-                      ? "New route"
-                      : "New route (\(RouteDraftStore.shared.count) from map)",
-                      systemImage: "plus.circle.fill")
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.borderedProminent)
-            .padding(.bottom, 8)
 
-            List {
-                ForEach(vm.createdRoutes) { route in
-                    NavigationLink {
-                        TourDetailsView(route: route, source: .profile)
-                    } label: {
-                        CreatedRouteCell(route: route)
-                    }
-                    .simultaneousGesture(TapGesture().onEnded {
-                        Analytics.track(.routeOpened, [
-                            "route_id": route.id,
-                            "route_title": route.title,
-                            "status": route.status.rawValue,
-                            "source": Analytics.Source.profile.rawValue,
-                            "is_own": true
-                        ])
-                    })
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            pendingCreatedDelete = route
-                            showCreatedDeleteConfirm = true
-                        } label: { Label("Delete", systemImage: "trash") }
-                    }
+    private func savedCaption(_ item: SavedRoute) -> String? {
+        guard let date = item.savedAt else { return nil }
+        return "Saved \(date.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    // MARK: - Created
+
+    private var createdList: some View {
+        List {
+            ForEach(vm.createdRoutes) { route in
+                NavigationLink {
+                    TourDetailsView(route: route, source: .profile)
+                } label: {
+                    RouteRow(route: route, caption: nil, showsStatus: true)
                 }
-            }
-            .listStyle(.plain)
-            .overlay {
-                if vm.createdRoutes.isEmpty {
-                    Text("You haven't created any routes yet")
-                        .foregroundColor(.secondary)
+                .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
+                .listRowSeparator(.hidden)
+                .simultaneousGesture(TapGesture().onEnded {
+                    Analytics.track(.routeOpened, [
+                        "route_id": route.id,
+                        "route_title": route.title,
+                        "status": route.status.rawValue,
+                        "source": Analytics.Source.profile.rawValue,
+                        "is_own": true
+                    ])
+                })
+                .swipeActions {
+                    Button(role: .destructive) {
+                        pendingCreatedDelete = route
+                        showCreatedDeleteConfirm = true
+                    } label: { Label("Delete", systemImage: "trash") }
                 }
             }
         }
-        .navigationDestination(isPresented: $showNewRoute) {
-            RouteEditorView(mode: .create) {
-                Task { await vm.fetchCreatedRoutes() }
+        .listStyle(.plain)
+        .overlay {
+            if vm.createdRoutes.isEmpty {
+                ContentUnavailableView {
+                    Label("No routes yet", systemImage: "map")
+                } description: {
+                    Text("Build one from places you like — the + button is up top.")
+                } actions: {
+                    Button("New route") {
+                        Analytics.track(.routeEditorOpened, [
+                            "mode": "create",
+                            "draft_size": RouteDraftStore.shared.count
+                        ])
+                        showNewRoute = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
         }
         .confirmationDialog("Delete this route? This cannot be undone.",
                             isPresented: $showCreatedDeleteConfirm) {
             Button("Delete", role: .destructive) {
-                if let r = pendingCreatedDelete {
-                    Task { await vm.deleteCreated(routeID: r.id) }
+                if let route = pendingCreatedDelete {
+                    Task { await vm.deleteCreated(routeID: route.id) }
                 }
             }
             Button("Cancel", role: .cancel) { pendingCreatedDelete = nil }
@@ -278,27 +363,30 @@ struct ProfileView: View {
         .refreshable { await vm.fetchCreatedRoutes() }
     }
 
-    // MARK: – Reviews list
+    // MARK: - Reviews
+
     private var reviewsList: some View {
         List {
-            ForEach(vm.myReviews) { rev in
-                ReviewRow(review: rev)
+            ForEach(vm.myReviews) { review in
+                ReviewRow(review: review)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
+                    .listRowSeparator(.hidden)
                     .swipeActions {
                         Button(role: .destructive) {
                             Analytics.track(.reviewDeleted, [
-                                "route_id": rev.routeID,
-                                "rating": rev.rating
+                                "route_id": review.routeID,
+                                "rating": review.rating
                             ])
-                            Task { await vm.delete(review: rev) }
+                            Task { await vm.delete(review: review) }
                         } label: { Label("Delete", systemImage: "trash") }
 
                         Button {
                             Analytics.track(.reviewFormOpened, [
-                                "route_id": rev.routeID,
+                                "route_id": review.routeID,
                                 "is_edit": true,
                                 "source": Analytics.Source.profile.rawValue
                             ])
-                            editingReview = rev
+                            editingReview = review
                         } label: { Label("Edit", systemImage: "pencil") }
                     }
             }
@@ -306,28 +394,100 @@ struct ProfileView: View {
         .listStyle(.plain)
         .overlay {
             if vm.myReviews.isEmpty {
-                Text("No reviews yet")
-                    .foregroundColor(.secondary)
+                ContentUnavailableView("No reviews yet",
+                                       systemImage: "star",
+                                       description: Text("Save a route, walk it, then tell people how it went."))
             }
         }
         .onAppear { vm.loadReviews() }
     }
 }
 
+// MARK: - Route row
 
+/// One row for both piles. The old version carried a blue "Saved" pill on every
+/// line inside the Saved tab — restating the tab you were already on, and squeezing
+/// every title down to "Classic Wars…".
+private struct RouteRow: View {
+    let route: TourRoute
+    var caption: String?
+    var showsStatus = false
 
-// MARK: mini-screen that shows map of a saved route
+    var body: some View {
+        HStack(spacing: 12) {
+            cover
+                .frame(width: 68, height: 68)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(route.title)
+                    .font(.subheadline.bold())
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+
+                HStack(spacing: 5) {
+                    if route.rating > 0 {
+                        Image(systemName: "star.fill").font(.caption2).foregroundColor(.yellow)
+                        Text(String(format: "%.1f", route.rating))
+                        Text("·")
+                    }
+                    Text("\(route.stopsCount) stops")
+                    Text("·")
+                    Text(route.duration.formattedDuration)
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+
+                if showsStatus, route.status != .public {
+                    RouteStatusBadge(status: route.status)
+                } else if let caption {
+                    Text(caption)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var cover: some View {
+        Group {
+            if let url = route.thumbnailURL {
+                WebImage(url: url,
+                         context: [.imageThumbnailPixelSize: CGSize(width: 200, height: 200)]) {
+                    $0.resizable().scaledToFill()
+                } placeholder: {
+                    gradient
+                }
+            } else {
+                gradient
+            }
+        }
+    }
+
+    private var gradient: some View {
+        LinearGradient(colors: [.blue.opacity(0.7), .indigo],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
+            .overlay(Image(systemName: "map").foregroundStyle(.white.opacity(0.9)))
+    }
+}
+
+// MARK: - Saved route map
+
 struct SavedRouteMapScreen: View {
     let routeID: String
     let title: String
-    
+
     @StateObject private var vm = TourDetailsViewModel()
-    
+
     var body: some View {
         RouteMapView(vm: vm)
             .navigationTitle(title)
             .onAppear {
-                // Coordinates not loaded yet — fetch the whole model
                 if vm.stops.isEmpty {
                     Task { await vm.load(routeID: routeID) }
                 }
@@ -335,36 +495,46 @@ struct SavedRouteMapScreen: View {
     }
 }
 
-// MARK: – Row
+// MARK: - Review row
+
 struct ReviewRow: View {
     let review: UserReview
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(review.routeTitle).font(.headline)
-                Spacer()
-                Stars(rating: review.rating)   // helper below
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(review.routeTitle)
+                    .font(.subheadline.bold())
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Stars(rating: review.rating)
             }
-            Text(review.text)
-                .font(.body)
+
+            if !review.text.isEmpty {
+                Text(review.text)
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+                    .lineLimit(4)
+            }
+
+            Text(review.createdAt.formatted(date: .abbreviated, time: .omitted))
+                .font(.caption2)
                 .foregroundColor(.secondary)
-                .lineLimit(3)
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.03), radius: 2, y: 1)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 14))
     }
 }
 
-// tiny star stack
+/// Tiny star stack, also used by the reviews on a route.
 struct Stars: View {
     let rating: Int
+
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(1...5, id:\.self) {
-                Image(systemName: $0 <= rating ? "star.fill" : "star")
+            ForEach(1...5, id: \.self) { index in
+                Image(systemName: index <= rating ? "star.fill" : "star")
                     .foregroundColor(.yellow)
                     .font(.caption2)
             }
@@ -372,18 +542,19 @@ struct Stars: View {
     }
 }
 
-// MARK: – Edit sheet
+// MARK: - Edit review
+
 struct EditReviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State var draft: UserReview
     let onSave: (UserReview) -> Void
-    
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("Rating") {
                     Picker("Rating", selection: $draft.rating) {
-                        ForEach(1...5, id:\.self) { Text("\($0)") }
+                        ForEach(1...5, id: \.self) { Text("\($0) ★") }
                     }
                     .pickerStyle(.segmented)
                 }
@@ -392,14 +563,13 @@ struct EditReviewSheet: View {
                         .frame(height: 120)
                 }
             }
-            .navigationTitle("Edit Review")
+            .navigationTitle("Edit review")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement:.confirmationAction) {
-                    Button("Save") {
-                        onSave(draft); dismiss()
-                    }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { onSave(draft); dismiss() }.bold()
                 }
-                ToolbarItem(placement:.cancellationAction) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", role: .cancel) { dismiss() }
                 }
             }
@@ -407,139 +577,6 @@ struct EditReviewSheet: View {
     }
 }
 
-
-// MARK: route cell
-private struct ProfileRouteCell: View {
-    let item: SavedRoute
-
-    var body: some View {
-        HStack(spacing: 12) {
-            // thumbnail
-            Group {
-                if let url = item.route.thumbnailURL {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let img): img.resizable().scaledToFill()
-                        default:
-                            Image(systemName: "photo")
-                                .resizable().scaledToFit()
-                                .foregroundColor(.gray.opacity(0.6))
-                        }
-                    }
-                } else {
-                    Image(systemName: "photo")
-                        .resizable()
-                        .scaledToFit()
-                        .foregroundColor(.gray.opacity(0.6))
-                        .background(Color.gray.opacity(0.1))
-                }
-            }
-            .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.route.title)
-                    .font(.headline)
-                    .lineLimit(1)
-                if let date = item.savedAt {
-                    Text("Saved \(date.formatted(date: .abbreviated, time: .omitted))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Spacer()
-
-            Text("Saved")
-                .font(.caption2).bold()
-                .foregroundColor(.white)
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Color.blue)
-                .clipShape(Capsule())
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-    }
-}
-
-// MARK: created route cell
-private struct CreatedRouteCell: View {
-    let route: TourRoute
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Group {
-                if let url = route.thumbnailURL {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let img): img.resizable().scaledToFill()
-                        default: Color(.systemGray5)
-                        }
-                    }
-                } else {
-                    Color(.systemGray5)
-                        .overlay(Image(systemName: "map").foregroundColor(.secondary))
-                }
-            }
-            .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(route.title).font(.headline).lineLimit(1)
-                Text("\(route.stopsCount) stops · \(route.duration.formattedDuration)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                RouteStatusBadge(status: route.status)
-            }
-
-            Spacer()
-
-            if route.reviewCount > 0 {
-                HStack(spacing: 3) {
-                    Image(systemName: "star.fill").font(.caption2).foregroundColor(.yellow)
-                    Text(String(format: "%.1f", route.rating)).font(.caption)
-                }
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-// MARK: review cell (placeholder)
-private struct ProfileReviewCell: View {
-    let title: String
-    let text: String
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title).font(.headline)
-                Spacer()
-                Image(systemName: "star.fill").foregroundColor(.yellow)
-                Text("5")
-            }
-            Text(text)
-                .font(.body)
-                .foregroundColor(.secondary)
-            HStack {
-                Button("Edit") { }
-                Spacer()
-                Button("Delete") { }
-                    .foregroundColor(.red)
-            }
-            .font(.caption)
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.03), radius: 2, x: 0, y: 1)
-    }
-}
-
-// MARK: preview
-struct ProfileView_Previews: PreviewProvider {
-    static var previews: some View {
-        ProfileView()
-    }
+#Preview {
+    ProfileView()
 }
