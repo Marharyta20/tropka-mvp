@@ -12,6 +12,7 @@ struct MapScreenView: View {
     @State private var searchText = ""
     @State private var selectedPlace: Place?
     @State private var recenterTrigger = 0
+    @State private var focusTrigger = 0
     @State private var searchDebounce: Task<Void, Never>?
 
     var body: some View {
@@ -27,13 +28,21 @@ struct MapScreenView: View {
                     ])
                     selectedPlace = place
                 },
-                recenterTrigger: recenterTrigger
+                recenterTrigger: recenterTrigger,
+                focusTrigger: focusTrigger
             )
             .ignoresSafeArea()
 
             VStack(spacing: 10) {
                 searchField
                 categoryChips
+                if !searchText.isEmpty && vm.filteredPlaces.isEmpty {
+                    Text("Nothing matches \"\(searchText)\"")
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.regularMaterial, in: Capsule())
+                }
             }
             .padding(.top, 6)
         }
@@ -46,6 +55,9 @@ struct MapScreenView: View {
                 // point of looking at a place on a map.
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
+        // The map runs edge to edge, so the translucent tab bar shows street labels
+        // through itself. Give it a solid background on this tab only.
+        .toolbarBackground(.visible, for: .tabBar)
         .trackScreen("Map")
         .onAppear { vm.loadPlaces() }
     }
@@ -65,8 +77,11 @@ struct MapScreenView: View {
                     searchDebounce?.cancel()
                     guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
                     searchDebounce = Task {
-                        try? await Task.sleep(nanoseconds: 800_000_000)
+                        try? await Task.sleep(nanoseconds: 500_000_000)
                         guard !Task.isCancelled else { return }
+                        // Take the camera to the matches — filtering pins the user
+                        // cannot see is indistinguishable from finding nothing.
+                        focusTrigger += 1
                         Analytics.track(.mapSearched, [
                             "query": query,
                             "results_count": vm.filteredPlaces.count

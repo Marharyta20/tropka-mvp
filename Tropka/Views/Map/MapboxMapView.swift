@@ -21,6 +21,8 @@ struct MapboxMapView: UIViewRepresentable {
     /// Bumped by the locate button — the value itself is meaningless, the change is
     /// the signal.
     var recenterTrigger: Int
+    /// Bumped when a search settles, so the camera can go where the matches are.
+    var focusTrigger: Int = 0
 
     /// Warsaw, so the first frame is a city rather than a globe.
     private static let fallbackCenter = CLLocationCoordinate2D(latitude: 52.2319, longitude: 21.0067)
@@ -57,6 +59,7 @@ struct MapboxMapView: UIViewRepresentable {
         context.coordinator.onPinTapped = onPinTapped
         context.coordinator.update(places: places)
         context.coordinator.recenterIfNeeded(trigger: recenterTrigger)
+        context.coordinator.focusIfNeeded(trigger: focusTrigger, on: places)
     }
 
     // MARK: - Coordinator
@@ -69,6 +72,7 @@ struct MapboxMapView: UIViewRepresentable {
         private var cancelables = Set<AnyCancelable>()
         private var places: [Place] = []
         private var lastRecenterTrigger = 0
+        private var lastFocusTrigger = 0
 
         /// The chosen set only changes with zoom, so it is worth keeping.
         private var cachedSelection: [Selection] = []
@@ -154,6 +158,30 @@ struct MapboxMapView: UIViewRepresentable {
                 )
             )
             mapView.viewport.transition(to: follow)
+        }
+
+        /// Filtering the pins is not enough: a search for "Warsaw Uprising Museum"
+        /// while the camera sits over Cupertino looks exactly like a search that
+        /// found nothing. Move the camera to the matches.
+        func focusIfNeeded(trigger: Int, on matches: [Place]) {
+            guard trigger != lastFocusTrigger, let mapView else { return }
+            lastFocusTrigger = trigger
+            guard !matches.isEmpty else { return }
+
+            let coordinates = matches.prefix(60).map(\.coordinates)
+            if coordinates.count == 1 {
+                mapView.camera.fly(to: CameraOptions(center: coordinates[0], zoom: 16), duration: 0.6)
+                return
+            }
+            if let camera = try? mapView.mapboxMap.camera(
+                for: Array(coordinates),
+                camera: CameraOptions(bearing: 0, pitch: 0),
+                coordinatesPadding: UIEdgeInsets(top: 160, left: 40, bottom: 120, right: 40),
+                maxZoom: 16,
+                offset: nil
+            ) {
+                mapView.camera.fly(to: camera, duration: 0.7)
+            }
         }
 
         // MARK: Rendering
