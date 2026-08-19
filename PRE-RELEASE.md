@@ -58,6 +58,16 @@ says what is blocked, why it was left for later, and what to do about it.
   died.
 - **Do when:** close to App Store release, together with the Pro upgrade.
 
+## Interface
+
+### Zoom buttons on the map — development crutch
+- `MapScreenView.mapControls` draws +/- buttons above the locate button, driven by
+  `zoomInTrigger` / `zoomOutTrigger` on `MapboxMapView`.
+- They exist because pinch-zooming in the Simulator is awkward. Phones have
+  fingers; every mainstream map app dropped these years ago.
+- **Do when:** before the App Store build — delete the `zoomButton` helper, the two
+  triggers, and `zoomIfNeeded` in the coordinator. `locateButton` stays.
+
 ## Ideas parked
 
 - Isochrones on the map ("what is within a 15-minute walk"), free with the

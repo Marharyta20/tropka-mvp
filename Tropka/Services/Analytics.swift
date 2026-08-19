@@ -149,6 +149,7 @@ extension Analytics {
         case mapFiltersOpened   = "map_filters_opened"
         case mapFiltersApplied  = "map_filters_applied"
         case mapZoomed          = "map_zoomed"
+        case mapGroupOpened     = "map_group_opened"
         case placeRouteTapped   = "place_related_route_tapped"
 
         // Tips

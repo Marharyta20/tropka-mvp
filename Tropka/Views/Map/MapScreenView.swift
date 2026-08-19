@@ -13,6 +13,8 @@ struct MapScreenView: View {
     @State private var selectedPlace: Place?
     @State private var recenterTrigger = 0
     @State private var focusTrigger = 0
+    @State private var zoomInTrigger = 0
+    @State private var zoomOutTrigger = 0
     @State private var searchDebounce: Task<Void, Never>?
 
     var body: some View {
@@ -29,7 +31,9 @@ struct MapScreenView: View {
                     selectedPlace = place
                 },
                 recenterTrigger: recenterTrigger,
-                focusTrigger: focusTrigger
+                focusTrigger: focusTrigger,
+                zoomInTrigger: zoomInTrigger,
+                zoomOutTrigger: zoomOutTrigger
             )
             .ignoresSafeArea()
 
@@ -46,7 +50,7 @@ struct MapScreenView: View {
             }
             .padding(.top, 6)
         }
-        .overlay(alignment: .bottomTrailing) { locateButton }
+        .overlay(alignment: .bottomTrailing) { mapControls }
         .sheet(item: $selectedPlace) { place in
             PlaceSheet(place: place)
                 .presentationDetents([.height(210), .medium, .large])
@@ -155,6 +159,36 @@ struct MapScreenView: View {
         .buttonStyle(.plain)
     }
 
+    private var mapControls: some View {
+        VStack(spacing: 10) {
+            // Temporary: pinch-zooming in the Simulator is awkward, so the map keeps
+            // explicit zoom buttons during development. Listed in PRE-RELEASE.md —
+            // real phones have fingers, these go before the App Store.
+            VStack(spacing: 1) {
+                zoomButton("plus") { zoomInTrigger += 1 }
+                Divider().frame(width: 44)
+                zoomButton("minus") { zoomOutTrigger += 1 }
+            }
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+
+            locateButton
+        }
+        .padding(.trailing, 16)
+        .padding(.bottom, 24)
+    }
+
+    private func zoomButton(_ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 44, height: 40)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var locateButton: some View {
         Button {
             recenterTrigger += 1
@@ -167,8 +201,6 @@ struct MapScreenView: View {
                 .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
         }
         .buttonStyle(.plain)
-        .padding(.trailing, 16)
-        .padding(.bottom, 24)
     }
 }
 
