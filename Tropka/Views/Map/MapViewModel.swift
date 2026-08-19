@@ -2,14 +2,20 @@ import Combine
 import CoreLocation
 import Foundation
 
-/// View-model providing places for the map and filtering logic.
+/// Places for the map, and the filtering on top of them.
+///
+/// The map used to load 300 rows and call it a day — a fifth of the catalogue,
+/// chosen at random by the database. It now loads every listed place; the pins are
+/// clustered rather than capped. Only the columns a pin needs are fetched: opening
+/// hours and tags are heavy and the place card loads them on demand.
+@MainActor
 final class MapViewModel: ObservableObject {
     @Published var places: [Place] = []
     @Published var searchQuery = ""
     @Published var selectedCategories = Set(PlaceCategory.allCases)
     @Published private var debouncedQuery = ""
 
-    private var cancellables = Set<AnyCancellable>()
+    private let pageSize = 1000
 
     init() {
         $searchQuery
@@ -18,79 +24,107 @@ final class MapViewModel: ObservableObject {
             .assign(to: &$debouncedQuery)
     }
 
+    // MARK: - Filtering
+
     var filteredPlaces: [Place] {
         places.filter { place in
             let matchesSearch = debouncedQuery.isEmpty ||
-                place.name.localizedCaseInsensitiveContains(debouncedQuery) ||
-                place.tags.contains { $0.localizedCaseInsensitiveContains(debouncedQuery) }
-            let matchesCategory = selectedCategories.contains(place.category)
-            return matchesSearch && matchesCategory
+                place.name.localizedCaseInsensitiveContains(debouncedQuery)
+            return matchesSearch && selectedCategories.contains(place.category)
         }
     }
 
-    // MARK: - Load from Supabase
+    var showsEverything: Bool {
+        selectedCategories.count == PlaceCategory.allCases.count
+    }
+
+    /// Categories that actually exist in the loaded data, most common first — a chip
+    /// for a category with no places is a dead end.
+    var availableCategories: [PlaceCategory] {
+        Dictionary(grouping: places, by: \.category)
+            .sorted { $0.value.count > $1.value.count }
+            .map(\.key)
+    }
+
+    func isolated(_ category: PlaceCategory) -> Bool {
+        selectedCategories == [category]
+    }
+
+    /// Tapping a chip shows that category alone; tapping it again brings everything
+    /// back. Map filters are a "show me only cafes" gesture, not a checklist.
+    func toggleIsolated(_ category: PlaceCategory) {
+        selectedCategories = isolated(category) ? Set(PlaceCategory.allCases) : [category]
+    }
+
+    // MARK: - Loading
 
     func loadPlaces() {
+        guard places.isEmpty else { return }
         Task {
             do {
-                let loaded = try await fetchPlaces()
-                await MainActor.run { self.places = loaded }
+                places = try await fetchAllPlaces()
             } catch {
-                print("❌ MapViewModel: failed to load places:", error)
+                print("MapViewModel: failed to load places:", error)
             }
         }
     }
 
-    private func fetchPlaces() async throws -> [Place] {
-        struct PlaceRow: Decodable {
-            let id: Int
-            let name: String
-            let lat: Double?
-            let lng: Double?
-            let ratingScore: Double?
-            let ratingReviews: Int?
-            let tags: [String]?
-            let photoUrl: String?
-            let categoryId: Int?
-            let openingHours: String?
+    private struct PlaceRow: Decodable {
+        let id: Int
+        let name: String
+        let lat: Double?
+        let lng: Double?
+        let ratingScore: Double?
+        let ratingReviews: Int?
+        let photoUrl: String?
+        let categoryId: Int?
 
-            enum CodingKeys: String, CodingKey {
-                case id, name, lat, lng, tags
-                case ratingScore   = "rating_score"
-                case ratingReviews = "rating_reviews"
-                case photoUrl      = "photo_url"
-                case categoryId    = "category_id"
-                case openingHours  = "opening_hours"
-            }
-        }
-
-        let rows: [PlaceRow] = try await supabase
-            .from("places")
-            .select("id, name, lat, lng, rating_score, rating_reviews, tags, photo_url, category_id, opening_hours")
-            .limit(300)
-            .execute()
-            .value
-
-        return rows.compactMap { row in
-            guard let lat = row.lat, let lng = row.lng else { return nil }
-            return Place(
-                id: String(row.id),
-                name: row.name,
-                category: placeCategory(for: row.categoryId),
-                coordinates: CLLocationCoordinate2D(latitude: lat, longitude: lng),
-                rating: row.ratingScore ?? 0,
-                reviewCount: row.ratingReviews ?? 0,
-                isOpenNow: OpeningHoursParser.isOpenNow(jsonString: row.openingHours),
-                tags: row.tags ?? [],
-                photoURL: row.photoUrl.flatMap(URL.init)
-            )
+        enum CodingKeys: String, CodingKey {
+            case id, name, lat, lng
+            case ratingScore   = "rating_score"
+            case ratingReviews = "rating_reviews"
+            case photoUrl      = "photo_url"
+            case categoryId    = "category_id"
         }
     }
 
-    // PlaceCategory's raw value is defined to match categories.id 1:1,
-    // so no manual lookup table is needed — unknown/missing IDs fall back to .other.
-    private func placeCategory(for id: Int?) -> PlaceCategory {
-        guard let id else { return .other }
-        return PlaceCategory(rawValue: id) ?? .other
+    /// PostgREST caps a response at 1000 rows, so the catalogue arrives in pages.
+    private func fetchAllPlaces() async throws -> [Place] {
+        var collected: [Place] = []
+        var offset = 0
+
+        while true {
+            let rows: [PlaceRow] = try await supabase
+                .from("places")
+                .select("id, name, lat, lng, rating_score, rating_reviews, photo_url, category_id")
+                .eq("is_listed", value: true)
+                .order("id")
+                .range(from: offset, to: offset + pageSize - 1)
+                .execute()
+                .value
+
+            collected.append(contentsOf: rows.compactMap(Self.map))
+            if rows.count < pageSize { break }
+            offset += rows.count
+        }
+
+        return collected
+    }
+
+    // PlaceCategory's raw value matches categories.id 1:1, so no lookup table is
+    // needed — unknown or missing ids fall back to .other.
+    private static func map(_ row: PlaceRow) -> Place? {
+        guard let lat = row.lat, let lng = row.lng else { return nil }
+        return Place(
+            id: String(row.id),
+            name: row.name,
+            category: row.categoryId.flatMap(PlaceCategory.init(rawValue:)) ?? .other,
+            coordinates: CLLocationCoordinate2D(latitude: lat, longitude: lng),
+            rating: row.ratingScore ?? 0,
+            reviewCount: row.ratingReviews ?? 0,
+            isOpenNow: nil,
+            tags: [],
+            photoURL: row.photoUrl.flatMap(URL.init)
+        )
     }
 }

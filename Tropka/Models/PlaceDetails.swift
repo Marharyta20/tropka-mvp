@@ -16,6 +16,9 @@ struct PlaceDetails: Identifiable, Equatable {
     let priceRange: String?
     let tags: [String]
     let photoURL: URL?
+    /// Author and licence of the photo, when it comes from a source that requires
+    /// credit (Wikimedia). nil for photos that need none.
+    let photoAttribution: String?
     /// A quote pulled from public reviews during import.
     let description: String?
     /// Tropka's own take on the place — the thing that makes this more than a listing.

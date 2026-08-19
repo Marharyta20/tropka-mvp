@@ -464,13 +464,12 @@ private struct StopRow: View {
 
             Spacer(minLength: 0)
 
-            if let url = stop.photoURL {
-                WebImage(url: url) { $0.resizable().scaledToFill() }
-                    placeholder: { Color(.systemGray5) }
-                    .frame(width: 52, height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .padding(.trailing, 20)
-            }
+            PlaceThumbnail(url: stop.photoURL,
+                           category: stop.category,
+                           thumbnailPixelSize: CGSize(width: 200, height: 200))
+                .frame(width: 52, height: 52)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.trailing, 20)
         }
         .contentShape(Rectangle())
     }

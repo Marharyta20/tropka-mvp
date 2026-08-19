@@ -1,11 +1,6 @@
 import SwiftUI
 import CoreLocation
 
-extension Notification.Name {
-    static let zoomIn = Notification.Name("zoomIn")
-    static let zoomOut = Notification.Name("zoomOut")
-}
-
 /// Categories of places shown on the map.
 /// Raw value matches `public.categories.id` in Supabase 1:1 so decoding
 /// a place's `category_id` never needs a hand-maintained lookup table.

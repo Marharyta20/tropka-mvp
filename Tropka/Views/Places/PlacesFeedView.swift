@@ -192,19 +192,9 @@ struct PlaceCard: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Group {
-                if let url = place.photoURL {
-                    WebImage(url: url,
-                             context: [.imageThumbnailPixelSize: CGSize(width: 320, height: 320)]) {
-                        $0.resizable().scaledToFill()
-                    } placeholder: {
-                        Color(.systemGray5)
-                    }
-                } else {
-                    Color(.systemGray5)
-                        .overlay(Image(systemName: place.category.icon).foregroundColor(.secondary))
-                }
-            }
+            PlaceThumbnail(url: place.photoURL,
+                           category: place.category,
+                           thumbnailPixelSize: CGSize(width: 320, height: 320))
             .frame(width: 84, height: 84)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 

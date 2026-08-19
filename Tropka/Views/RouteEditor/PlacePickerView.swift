@@ -88,16 +88,9 @@ private struct PlaceRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Group {
-                if let url = place.photoURL {
-                    WebImage(url: url) { $0.resizable().scaledToFill() }
-                        placeholder: { Color(.systemGray5) }
-                } else {
-                    Color(.systemGray5)
-                        .overlay(Image(systemName: place.category.icon)
-                            .foregroundColor(.secondary))
-                }
-            }
+            PlaceThumbnail(url: place.photoURL,
+                           category: place.category,
+                           thumbnailPixelSize: CGSize(width: 200, height: 200))
             .frame(width: 52, height: 52)
             .clipShape(RoundedRectangle(cornerRadius: 10))
 

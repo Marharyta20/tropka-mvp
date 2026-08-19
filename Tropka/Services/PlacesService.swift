@@ -42,6 +42,7 @@ final class PlacesService {
         let priceRange: String?
         let tags: [String]?
         let photoUrl: String?
+        let photoAttribution: String?
         let shortDescription: String?
         let tropkaNotes: String?
         let instagramWebsite: String?
@@ -54,6 +55,7 @@ final class PlacesService {
             case ratingReviews     = "rating_reviews"
             case priceRange        = "price_range"
             case photoUrl          = "photo_url"
+            case photoAttribution  = "photo_attribution"
             case shortDescription  = "short_description"
             case tropkaNotes       = "tropka_notes"
             case instagramWebsite  = "instagram_website"
@@ -65,7 +67,8 @@ final class PlacesService {
     private static let pickColumns = "id, name, address, photo_url, category_id"
     private static let fullColumns = """
         id, name, address, lat, lng, rating_score, rating_reviews, price_range, tags, \
-        photo_url, short_description, tropka_notes, instagram_website, opening_hours, category_id
+        photo_url, photo_attribution, short_description, tropka_notes, instagram_website, \
+        opening_hours, category_id
         """
 
     // MARK: - Editor picker
@@ -80,6 +83,7 @@ final class PlacesService {
             rows = try await supabase
                 .from("places")
                 .select(Self.pickColumns)
+                .eq("is_listed", value: true)
                 .order("name")
                 .limit(limit)
                 .execute()
@@ -88,6 +92,7 @@ final class PlacesService {
             rows = try await supabase
                 .from("places")
                 .select(Self.pickColumns)
+                .eq("is_listed", value: true)
                 .ilike("name", pattern: "%\(trimmed)%")
                 .order("name")
                 .limit(limit)
@@ -116,7 +121,9 @@ final class PlacesService {
               offset: Int,
               pageSize: Int = 30) async throws -> [PlaceDetails] {
 
-        var builder = supabase.from("places").select(Self.fullColumns)
+        // Import noise (bus stops, offices, bare addresses) is flagged, not deleted:
+        // routes may still point at it, but it has no business in the catalogue.
+        var builder = supabase.from("places").select(Self.fullColumns).eq("is_listed", value: true)
 
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty {
@@ -207,6 +214,7 @@ final class PlacesService {
             priceRange: row.priceRange,
             tags: row.tags ?? [],
             photoURL: row.photoUrl.flatMap(URL.init),
+            photoAttribution: row.photoAttribution?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
             description: cleanQuote(row.shortDescription),
             notes: row.tropkaNotes?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
             link: row.instagramWebsite.flatMap(URL.init),

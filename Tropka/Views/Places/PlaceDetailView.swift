@@ -57,20 +57,23 @@ struct PlaceDetailView: View {
     // MARK: - Sections
 
     private func hero(_ place: PlaceDetails) -> some View {
-        Group {
-            if let url = place.photoURL {
-                WebImage(url: url) { $0.resizable().scaledToFill() }
-                    placeholder: { Color(.systemGray5) }
-            } else {
-                Color(.systemGray5)
-                    .overlay(Image(systemName: place.category.icon)
-                        .font(.largeTitle)
-                        .foregroundColor(.secondary))
+        PlaceThumbnail(url: place.photoURL, category: place.category)
+            .frame(maxWidth: .infinity)
+            .frame(height: 260)
+            .clipped()
+            // Wikimedia photos may be used freely, but only with credit.
+            .overlay(alignment: .bottomTrailing) {
+                if let credit = place.photoAttribution {
+                    Text(credit)
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.35), in: Capsule())
+                        .padding(8)
+                }
             }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 260)
-        .clipped()
     }
 
     private func header(_ place: PlaceDetails) -> some View {

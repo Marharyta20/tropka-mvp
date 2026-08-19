@@ -66,10 +66,12 @@ final class SupabaseService {
                 let lat: Double
                 let lng: Double
                 let photoUrl: String?
+                let categoryId: Int?
 
                 enum CodingKeys: String, CodingKey {
                     case name, lat, lng
                     case photoUrl = "photo_url"
+                    case categoryId = "category_id"
                 }
             }
 
@@ -86,7 +88,7 @@ final class SupabaseService {
 
         let rows: [StopRow] = try await supabase
             .from("route_stops")
-            .select("id, place_id, order_index, notes, photo_url, time_spent, places(name, lat, lng, photo_url)")
+            .select("id, place_id, order_index, notes, photo_url, time_spent, places(name, lat, lng, photo_url, category_id)")
             .eq("route_id", value: routeID)
             .order("order_index")
             .execute()
@@ -97,6 +99,7 @@ final class SupabaseService {
                 id: row.id,
                 placeID: row.placeId,
                 name: row.places.name,
+                category: row.places.categoryId.flatMap(PlaceCategory.init(rawValue:)) ?? .other,
                 lat: row.places.lat,
                 lng: row.places.lng,
                 orderIndex: row.orderIndex,

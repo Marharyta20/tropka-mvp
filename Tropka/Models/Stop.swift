@@ -10,6 +10,8 @@ struct Stop: Identifiable, Equatable {
     /// real curated place rather than an arbitrary coordinate.
     let placeID: Int
     let name: String
+    /// Mirrors the place's category — used for the fallback thumbnail.
+    let category: PlaceCategory
     let lat: Double
     let lng: Double
     let orderIndex: Int
