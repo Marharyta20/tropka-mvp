@@ -6,6 +6,9 @@ class SettingsViewModel: ObservableObject {
     @Published var username = ""
     @Published var error: String?
     @Published var isBusy = false
+    /// Nothing may be saved before the current values have been read: saving a
+    /// field the user never saw would overwrite their profile with a blank.
+    @Published var isLoaded = false
 
     init() { Task { await load() } }
 
@@ -33,6 +36,7 @@ class SettingsViewModel: ObservableObject {
                 .value
             displayName = row.fullName ?? ""
             username    = row.username ?? ""
+            isLoaded = true
         } catch {
             self.error = error.localizedDescription
         }
@@ -42,6 +46,12 @@ class SettingsViewModel: ObservableObject {
 
     func save() async {
         guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
+        let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let handle = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isLoaded, !name.isEmpty, !handle.isEmpty else {
+            error = "Name and username can't be empty."
+            return
+        }
         isBusy = true
         defer { isBusy = false }
 
@@ -57,7 +67,7 @@ class SettingsViewModel: ObservableObject {
         do {
             try await supabase
                 .from("users")
-                .update(UserUpdate(fullName: displayName, username: username))
+                .update(UserUpdate(fullName: name, username: handle))
                 .eq("id", value: uid)
                 .execute()
         } catch {
@@ -85,8 +95,4 @@ class SettingsViewModel: ObservableObject {
         }
     }
 
-    func prefill(with p: ProfileViewModel) {
-        displayName = p.displayName
-        username    = p.handle
-    }
 }

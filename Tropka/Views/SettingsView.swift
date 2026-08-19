@@ -35,6 +35,7 @@ struct SettingsView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(!vm.isLoaded || vm.isBusy)
                 .frame(maxWidth: .infinity)
 
                 //–– Sign out
@@ -77,7 +78,7 @@ struct SettingsView: View {
         ) { Button("OK", role: .cancel) { } } message: {
             Text(vm.error ?? "")
         }
-        .onAppear { vm.prefill(with: profileVM) }
+        .task { await vm.load() }
     }
 
     // MARK: reusable field

@@ -15,7 +15,10 @@ struct SavedRoute: Identifiable {
 class ProfileViewModel: ObservableObject {
 
     // User info
-    @Published var displayName = "Loading..."
+    @Published var displayName = ""
+    /// True until the profile row has been read once — lets the UI show a
+    /// placeholder instead of a fake name.
+    @Published var isLoadingProfile = true
     @Published var handle      = ""
     @Published var city        = ""
     @Published var registrationDate: Date?
@@ -58,7 +61,11 @@ class ProfileViewModel: ObservableObject {
     // MARK: - Profile
 
     private func fetchUserProfile() async {
-        guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
+        guard let uid = supabase.auth.currentUser?.id.uuidString else {
+            isLoadingProfile = false
+            return
+        }
+        defer { isLoadingProfile = false }
 
         struct UserRow: Decodable {
             let fullName: String?

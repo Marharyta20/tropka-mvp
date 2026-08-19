@@ -1,29 +1,59 @@
 import SwiftUI
 
-class AuthViewModel: ObservableObject {
+@MainActor
+final class AuthViewModel: ObservableObject {
+
+    /// Three states, not two. "We don't know yet" is a real state: reading the
+    /// stored session takes a moment, and showing the login screen during that
+    /// moment is what makes a signed-in user think they were signed out.
+    enum State {
+        case checking
+        case signedIn
+        case signedOut
+    }
+
+    @Published var state: State = .checking
+
     @Published var email = ""
     @Published var password = ""
     @Published var fullName = ""
 
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var isAuthenticated = false
+
+    var isAuthenticated: Bool { state == .signedIn }
 
     init() {
-        isAuthenticated = supabase.auth.currentSession != nil
-        // Returning user: re-attach analytics to their id before anything else is tracked.
+        // Returning user: re-attach analytics to their id before anything is tracked.
         if let userID = supabase.auth.currentUser?.id.uuidString {
             Analytics.identify(userID: userID)
         }
         listenToAuthChanges()
+        Task { await restore() }
+    }
+
+    /// Decides the opening screen. A stored session that cannot be refreshed right
+    /// now (no signal, airplane mode) still counts as signed in.
+    private func restore() async {
+        let hasSession = await AuthService.shared.restoreSession()
+        if state == .checking {
+            state = hasSession ? .signedIn : .signedOut
+        }
     }
 
     private func listenToAuthChanges() {
         Task {
-            for await (_, session) in supabase.auth.authStateChanges {
+            for await (event, session) in supabase.auth.authStateChanges {
                 await MainActor.run {
-                    self.isAuthenticated = session != nil
-                    // Tie everything the anonymous session did to the real user id.
+                    switch event {
+                    case .signedOut, .userDeleted:
+                        self.state = .signedOut
+                    case .tokenRefreshed, .signedIn, .initialSession, .userUpdated, .passwordRecovery:
+                        self.state = session != nil ? .signedIn : self.state
+                    default:
+                        break
+                    }
+                    // Tie everything the session did to the real user id.
                     if let userID = session?.user.id.uuidString {
                         Analytics.identify(userID: userID)
                     }
@@ -39,6 +69,10 @@ class AuthViewModel: ObservableObject {
             errorMessage = "Please fill in all fields"
             return
         }
+        guard password.count >= 6 else {
+            errorMessage = "Password must be at least 6 characters"
+            return
+        }
         isLoading = true
         errorMessage = nil
         Task {
@@ -47,9 +81,9 @@ class AuthViewModel: ObservableObject {
                 Analytics.track(.signedUp)
             } catch {
                 Analytics.track(.authFailed, ["mode": "sign_up", "reason": error.localizedDescription])
-                await MainActor.run { self.errorMessage = error.localizedDescription }
+                errorMessage = error.localizedDescription
             }
-            await MainActor.run { self.isLoading = false }
+            isLoading = false
         }
     }
 
@@ -68,9 +102,9 @@ class AuthViewModel: ObservableObject {
                 Analytics.track(.loggedIn)
             } catch {
                 Analytics.track(.authFailed, ["mode": "log_in", "reason": error.localizedDescription])
-                await MainActor.run { self.errorMessage = error.localizedDescription }
+                errorMessage = error.localizedDescription
             }
-            await MainActor.run { self.isLoading = false }
+            isLoading = false
         }
     }
 
@@ -81,12 +115,10 @@ class AuthViewModel: ObservableObject {
             try? await AuthService.shared.signOut()
             Analytics.track(.signedOut)
             Analytics.reset()   // next person on this device is a separate user
-            await MainActor.run {
-                self.isAuthenticated = false
-                self.email = ""
-                self.password = ""
-                self.fullName = ""
-            }
+            state = .signedOut
+            email = ""
+            password = ""
+            fullName = ""
         }
     }
 }

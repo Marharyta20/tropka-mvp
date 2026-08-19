@@ -77,7 +77,7 @@ struct ProfileView: View {
             .buttonStyle(.plain)
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(vm.displayName)                // full name
+                Text(vm.isLoadingProfile ? "…" : (vm.displayName.isEmpty ? "No name yet" : vm.displayName))
                     .font(.title3).bold()
                 Text("@\(vm.handle) · \(vm.city)")
                     .font(.subheadline)

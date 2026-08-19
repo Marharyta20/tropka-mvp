@@ -21,6 +21,12 @@ struct MapRepresentable: UIViewRepresentable {
 
         mapView.ornaments.scaleBarView.isHidden = true
         mapView.ornaments.compassView.isHidden = false
+        // Mapbox puts the attribution "i" at bottom-trailing by default — directly
+        // under our locate button, so aiming for one hits the other. It cannot be
+        // hidden (Mapbox and OpenStreetMap both require it), but it can move: park
+        // it next to the logo in the opposite corner.
+        mapView.ornaments.options.attributionButton.position = .bottomLeading
+        mapView.ornaments.options.attributionButton.margins = CGPoint(x: 100, y: 8)
 
         mapView.location.options.puckType = .puck2D()
         mapView.location.options.puckBearing = .heading

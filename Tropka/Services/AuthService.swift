@@ -1,4 +1,5 @@
 import Foundation
+import Supabase
 
 // MARK: - AuthService (Supabase Auth)
 
@@ -50,5 +51,45 @@ final class AuthService {
     func signOut() async throws {
         try await supabase.auth.signOut()
     }
-}
 
+    // MARK: - Password recovery
+
+    /// Sends the six-digit recovery code to the address.
+    ///
+    /// Deliberately not a magic link: a link drags the user out to Safari and back,
+    /// needs a URL scheme and a redirect allow-list, and breaks entirely if the mail
+    /// is read on a different device. A code can be typed anywhere.
+    func sendRecoveryCode(email: String) async throws {
+        try await supabase.auth.resetPasswordForEmail(email)
+    }
+
+    /// Exchanges the code for a session. From here the user is signed in and may
+    /// set a new password — that is how Supabase's recovery flow works.
+    func verifyRecoveryCode(email: String, code: String) async throws {
+        try await supabase.auth.verifyOTP(email: email, token: code, type: .recovery)
+    }
+
+    func updatePassword(_ newPassword: String) async throws {
+        try await supabase.auth.update(user: UserAttributes(password: newPassword))
+    }
+
+    // MARK: - Session
+
+    /// Refreshes the stored session and reports whether it is still valid.
+    ///
+    /// A thrown error is *not* the same as "signed out": no network means we cannot
+    /// tell, and dropping the user to the login screen because their train went into
+    /// a tunnel is the bug this exists to avoid. Only `sessionMissing` is an answer.
+    func restoreSession() async -> Bool {
+        if supabase.auth.currentSession == nil { return false }
+        do {
+            _ = try await supabase.auth.session
+            return true
+        } catch let error as AuthError {
+            if case .sessionMissing = error { return false }
+            return true
+        } catch {
+            return true
+        }
+    }
+}

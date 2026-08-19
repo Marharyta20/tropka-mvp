@@ -2,11 +2,13 @@ import SwiftUI
 
 struct LoginView: View {
     @ObservedObject var authVM: AuthViewModel
+
     @State private var isSignUpMode = false
+    @State private var showForgotPassword = false
 
     var body: some View {
         VStack(spacing: 20) {
-            
+
             Text(isSignUpMode ? "Create Account" : "Welcome!")
                 .font(.largeTitle)
                 .fontWeight(.bold)
@@ -15,17 +17,28 @@ struct LoginView: View {
             if isSignUpMode {
                 TextField("Full Name", text: $authVM.fullName)
                     .textFieldStyle(.roundedBorder)
-                    .autocapitalization(.words)
+                    .textInputAutocapitalization(.words)
                     .transition(.opacity)
             }
 
             TextField("Email", text: $authVM.email)
                 .textFieldStyle(.roundedBorder)
-                .autocapitalization(.none)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
                 .keyboardType(.emailAddress)
+                .textContentType(.emailAddress)
 
             SecureField("Password", text: $authVM.password)
                 .textFieldStyle(.roundedBorder)
+                .textContentType(isSignUpMode ? .newPassword : .password)
+
+            if !isSignUpMode {
+                Button("Forgot password?") {
+                    showForgotPassword = true
+                }
+                .font(.footnote)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
 
             if let error = authVM.errorMessage {
                 Text(error)
@@ -33,19 +46,19 @@ struct LoginView: View {
                     .font(.caption)
                     .multilineTextAlignment(.center)
             }
-            
+
             if authVM.isLoading {
                 ProgressView()
             }
 
-            Button(action: {
+            Button {
                 UIApplication.shared.endEditing()
                 if isSignUpMode {
                     authVM.register()
                 } else {
                     authVM.login()
                 }
-            }) {
+            } label: {
                 Text(isSignUpMode ? "Sign Up" : "Log In")
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
@@ -56,19 +69,22 @@ struct LoginView: View {
             .disabled(authVM.isLoading)
             .padding(.top, 10)
 
-            Button(action: {
+            Button {
                 Analytics.track(.authModeToggled, ["to": isSignUpMode ? "log_in" : "sign_up"])
                 withAnimation {
                     isSignUpMode.toggle()
                     authVM.errorMessage = nil
                 }
-            }) {
+            } label: {
                 Text(isSignUpMode ? "Already have an account? Log In" : "Don't have an account? Sign Up")
                     .foregroundColor(.blue)
             }
         }
         .padding()
         .animation(.default, value: isSignUpMode)
+        .sheet(isPresented: $showForgotPassword) {
+            ForgotPasswordView(email: authVM.email)
+        }
         .trackScreen("Login")
     }
 }

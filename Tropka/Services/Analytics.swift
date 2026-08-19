@@ -98,6 +98,8 @@ extension Analytics {
         case authFailed         = "auth_failed"
         case authModeToggled    = "auth_mode_toggled"
         case signedOut          = "signed_out"
+        case passwordResetRequested = "password_reset_requested"
+        case passwordResetCompleted = "password_reset_completed"
         case accountDeleted     = "account_deleted"
 
         // Navigation
