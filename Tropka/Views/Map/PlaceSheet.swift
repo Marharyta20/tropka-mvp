@@ -18,16 +18,26 @@ struct PlaceSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            VStack(spacing: 0) {
+                // Kept out of the scroll view on purpose. This is exactly what the
+                // small detent shows, and a sheet only resizes when the drag starts
+                // on something that does not scroll — so this block is the handle.
                 VStack(alignment: .leading, spacing: 20) {
                     header
                     actions
-                    photo
-                    if let tags = details?.tags, !tags.isEmpty { tagRow(tags) }
-                    if let notes = details?.notes { tropkaNote(notes) }
-                    relatedSection
                 }
-                .padding(.bottom, 32)
+                .padding(.bottom, 16)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        photo
+                        if let tags = details?.tags, !tags.isEmpty { tagRow(tags) }
+                        if let notes = details?.notes { tropkaNote(notes) }
+                        relatedSection
+                    }
+                    .padding(.top, 4)
+                    .padding(.bottom, 32)
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)

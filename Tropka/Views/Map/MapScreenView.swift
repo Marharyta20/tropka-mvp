@@ -11,6 +11,13 @@ struct MapScreenView: View {
 
     @State private var searchText = ""
     @State private var selectedPlace: Place?
+    /// Set when a pin is tapped while a card is already open. The open card is
+    /// dismissed first and this place is presented from `onDismiss`.
+    @State private var queuedPlace: Place?
+    /// Which height the place card opens at. Without an explicit selection SwiftUI
+    /// reuses whatever the previous card was left at, so one place would open as a
+    /// strip and the next one full-screen for no reason the user could see.
+    @State private var placeDetent: PresentationDetent = .height(210)
     @State private var recenterTrigger = 0
     @State private var focusTrigger = 0
     @State private var zoomInTrigger = 0
@@ -28,7 +35,7 @@ struct MapScreenView: View {
                         "category": place.category.displayName,
                         "rating": place.rating
                     ])
-                    selectedPlace = place
+                    show(place)
                 },
                 recenterTrigger: recenterTrigger,
                 focusTrigger: focusTrigger,
@@ -51,10 +58,16 @@ struct MapScreenView: View {
             .padding(.top, 6)
         }
         .overlay(alignment: .bottomTrailing) { mapControls }
-        .sheet(item: $selectedPlace) { place in
+        .sheet(item: $selectedPlace, onDismiss: presentQueuedPlace) { place in
             PlaceSheet(place: place)
-                .presentationDetents([.height(210), .medium, .large])
+                .presentationDetents([.height(210), .medium, .large], selection: $placeDetent)
                 .presentationDragIndicator(.visible)
+                // Without this the sheet grows to full height on its own: UIKit
+                // expands a detented sheet whenever the scroll view inside it
+                // scrolls away from the top, and the card's photo arriving late is
+                // enough to trigger that. Swipes inside the card now scroll it;
+                // the header above the scroll view is what resizes the sheet.
+                .presentationContentInteraction(.scrolls)
                 // Half-open the card and the map underneath still pans — the whole
                 // point of looking at a place on a map.
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
@@ -64,6 +77,30 @@ struct MapScreenView: View {
         .toolbarBackground(.visible, for: .tabBar)
         .trackScreen("Map")
         .onAppear { vm.loadPlaces() }
+    }
+
+    // MARK: - Presenting a place
+
+    /// A sheet that is already on screen keeps the height the previous place left
+    /// it at — swapping the item underneath it does not reset anything, and writing
+    /// the detent binding while it is presented is ignored. Only a fresh
+    /// presentation opens at the first detent reliably, so tapping a second pin
+    /// closes the open card and reopens it for the new place.
+    private func show(_ place: Place) {
+        guard selectedPlace != nil else {
+            placeDetent = .height(210)
+            selectedPlace = place
+            return
+        }
+        queuedPlace = place
+        selectedPlace = nil
+    }
+
+    private func presentQueuedPlace() {
+        placeDetent = .height(210)
+        guard let next = queuedPlace else { return }
+        queuedPlace = nil
+        selectedPlace = next
     }
 
     // MARK: - Controls
