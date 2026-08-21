@@ -30,6 +30,8 @@ class ProfileViewModel: ObservableObject {
 
     // Routes this user wrote
     @Published var createdRoutes: [TourRoute] = []
+    /// Routes the user has marked as walked, newest first.
+    @Published var walkedRoutes: [TourRoute] = []
 
     // Reviews
     @Published var myReviews: [UserReview] = []
@@ -52,9 +54,14 @@ class ProfileViewModel: ObservableObject {
     // MARK: - Load all
 
     func fetchAll() async {
+        // Cleared here rather than in each fetch: the banner in ProfileView is
+        // shared, and a stale message from a failure the user has already
+        // retried past would sit there forever.
+        errorMessage = nil
         await fetchUserProfile()
         await fetchSavedRoutes()
         await fetchCreatedRoutes()
+        await fetchWalkedRoutes()
         loadReviews()
     }
 
@@ -96,6 +103,7 @@ class ProfileViewModel: ObservableObject {
             displayName      = row.fullName ?? "Unknown User"
             handle           = row.username ?? "user"
             avatarValue      = row.photoUrl
+            UserPreferences.shared.setAvatar(row.photoUrl)
             city             = row.cities?.name ?? ""
             registrationDate = row.registrationDate
         } catch {
@@ -109,6 +117,8 @@ class ProfileViewModel: ObservableObject {
         guard let uid = supabase.auth.currentUser?.id.uuidString else { return }
         let previous = avatarValue
         avatarValue = avatar.storedValue      // optimistic, the grid closes immediately
+        // Every card in the app that draws this user updates from here.
+        UserPreferences.shared.setAvatar(avatar.storedValue)
 
         struct AvatarUpdate: Encodable {
             let photoUrl: String
@@ -124,6 +134,7 @@ class ProfileViewModel: ObservableObject {
             Analytics.track(.avatarChanged, ["avatar": avatar.id])
         } catch {
             avatarValue = previous
+            UserPreferences.shared.setAvatar(previous)
             errorMessage = error.localizedDescription
         }
     }
@@ -171,6 +182,19 @@ class ProfileViewModel: ObservableObject {
     }
 
     // MARK: - Created routes
+
+    func fetchWalkedRoutes() async {
+        do {
+            walkedRoutes = try await RouteCompletionService().walkedRoutes()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        // The ids come from their own query rather than from the list above: a
+        // route whose author has since made it private drops out of the embed,
+        // but it is still one the user walked, and the badge on it elsewhere
+        // should not vanish because of somebody else's edit.
+        await WalkedRoutesStore.shared.refresh()
+    }
 
     func fetchCreatedRoutes() async {
         guard let uid = supabase.auth.currentUser?.id.uuidString else { return }

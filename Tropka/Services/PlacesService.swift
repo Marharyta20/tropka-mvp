@@ -44,8 +44,13 @@ final class PlacesService {
         let photoUrl: String?
         let photoAttribution: String?
         let shortDescription: String?
+        let summary: String?
+        let summaryAttribution: String?
+        let summaryUrl: String?
         let tropkaNotes: String?
         let instagramWebsite: String?
+        let googleMapsAttributes: String?
+        let sourceUrl: String?
         let openingHours: String?
         let categoryId: Int?
 
@@ -57,8 +62,13 @@ final class PlacesService {
             case photoUrl          = "photo_url"
             case photoAttribution  = "photo_attribution"
             case shortDescription  = "short_description"
+            case summary
+            case summaryAttribution = "summary_attribution"
+            case summaryUrl = "summary_url"
             case tropkaNotes       = "tropka_notes"
             case instagramWebsite  = "instagram_website"
+            case googleMapsAttributes = "google_maps_attributes"
+            case sourceUrl         = "source_url"
             case openingHours      = "opening_hours"
             case categoryId        = "category_id"
         }
@@ -67,8 +77,10 @@ final class PlacesService {
     private static let pickColumns = "id, name, address, photo_url, category_id"
     private static let fullColumns = """
         id, name, address, lat, lng, rating_score, rating_reviews, price_range, tags, \
-        photo_url, photo_attribution, short_description, tropka_notes, instagram_website, \
-        opening_hours, category_id
+        photo_url, photo_attribution, short_description, summary, summary_attribution, \
+        summary_url, \
+        tropka_notes, instagram_website, \
+        source_url, google_maps_attributes, opening_hours, category_id
         """
 
     // MARK: - Editor picker
@@ -136,6 +148,9 @@ final class PlacesService {
 
         let rows: [Row] = try await builder
             .order(sort.column, ascending: sort.ascending, nullsFirst: false)
+            // Without a unique tiebreaker Postgres may order ties differently per
+            // request, so page 2 repeats rows from page 1 and silently drops others.
+            .order("id", ascending: true)
             .range(from: offset, to: offset + pageSize - 1)
             .execute()
             .value
@@ -215,9 +230,14 @@ final class PlacesService {
             tags: row.tags ?? [],
             photoURL: row.photoUrl.flatMap(URL.init),
             photoAttribution: row.photoAttribution?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+            summary: row.summary?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+            summaryAttribution: row.summaryAttribution?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+            summaryURL: row.summaryUrl.flatMap(URL.init),
             description: cleanQuote(row.shortDescription),
+            highlights: PlaceHighlights.from(json: row.googleMapsAttributes),
             notes: row.tropkaNotes?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
             link: row.instagramWebsite.flatMap(URL.init),
+            sourceURL: row.sourceUrl.flatMap(URL.init),
             openingHoursRaw: row.openingHours
         )
     }

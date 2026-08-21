@@ -282,7 +282,11 @@ struct RouteEditorView: View {
             // Pick up anything collected before the editor was opened — places
             // tapped on the map, or every place in a tip.
             guard stops.isEmpty else { return }
-            stops = draftStore.drain()
+            // Copy, do not drain. Draining here meant that opening the editor and
+            // backing out without saving threw away everything the author had
+            // collected on the map, with no prompt and no undo. The store is
+            // cleared once the route exists — see `save()`.
+            stops = draftStore.stops
             if title.isEmpty, let prefillTitle { title = prefillTitle }
             if routeDescription.isEmpty, let prefillDescription { routeDescription = prefillDescription }
 
@@ -344,6 +348,8 @@ struct RouteEditorView: View {
                                                        stops: stops)
                 properties["route_id"] = id
                 Analytics.track(.routeCreated, properties)
+                // The collected places are now stops on a real route.
+                draftStore.clear()
 
             case let .edit(routeID):
                 try await service.updateRoute(routeID: routeID,

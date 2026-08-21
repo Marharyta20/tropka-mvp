@@ -15,26 +15,49 @@ final class PlacesFeedViewModel: ObservableObject {
 
     @Published var isLoading = false
     @Published var errorMessage: String?
+    /// False until the first page has come back, so the feed does not claim
+    /// "Nothing matches" before it has asked for anything.
+    @Published private(set) var hasLoaded = false
 
     private var offset = 0
     private var reachedEnd = false
     private let pageSize = 30
+    /// Bumped by every reload. A page that arrives after the query changed belongs
+    /// to the old query and is dropped instead of being appended into a list that
+    /// has already been cleared.
+    private var generation = 0
 
     var visible: [PlaceDetails] {
         openNowOnly ? places.filter { $0.isOpenNow == true } : places
     }
 
     func reload() async {
+        generation += 1
+        // Any page still in flight belongs to the previous query. Releasing the
+        // flag here is what lets the new query start immediately; the stale page
+        // is discarded by the generation check below rather than appended into a
+        // list that has just been emptied.
+        isLoading = false
         offset = 0
         reachedEnd = false
         places = []
-        await loadMore()
+        await load(generation: generation)
     }
 
     func loadMore() async {
         guard !isLoading, !reachedEnd else { return }
+        await load(generation: generation)
+    }
+
+    private func load(generation gen: Int) async {
         isLoading = true
-        defer { isLoading = false }
+        // `return` is not allowed inside a defer block, hence the plain if.
+        defer {
+            if gen == generation {
+                isLoading = false
+                hasLoaded = true
+            }
+        }
 
         do {
             let page = try await PlacesService.shared.feed(
@@ -44,18 +67,25 @@ final class PlacesFeedViewModel: ObservableObject {
                 offset: offset,
                 pageSize: pageSize
             )
+            guard gen == generation else { return }
             places.append(contentsOf: page)
             offset += page.count
             reachedEnd = page.count < pageSize
             errorMessage = nil
         } catch {
+            guard gen == generation else { return }
             errorMessage = error.localizedDescription
-            reachedEnd = true
+            // Deliberately not setting `reachedEnd`: one timeout used to disable
+            // pagination for the rest of the session, with no way back except a
+            // pull to refresh the user had no reason to try.
         }
     }
 
     func loadMoreIfNeeded(current place: PlaceDetails) async {
-        guard let last = places.last, last.id == place.id else { return }
+        // Keyed off `visible`, not `places`. With "Open now" on, the last loaded
+        // place is usually filtered out of the list, so the row that would have
+        // asked for the next page was never rendered and scrolling stopped dead.
+        guard let last = visible.last, last.id == place.id else { return }
         await loadMore()
     }
 }
@@ -77,12 +107,23 @@ struct PlacesFeedView: View {
                 ContentUnavailableView("Couldn't load places",
                                        systemImage: "exclamationmark.triangle",
                                        description: Text(errorMessage))
-            } else if vm.visible.isEmpty && !vm.isLoading {
-                ContentUnavailableView("Nothing matches",
-                                       systemImage: "magnifyingglass",
-                                       description: Text(vm.openNowOnly
-                                                         ? "Nothing loaded so far is open right now."
-                                                         : "Try a different name or fewer filters."))
+            } else if !vm.hasLoaded || (vm.isLoading && vm.places.isEmpty) {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if vm.visible.isEmpty {
+                ContentUnavailableView {
+                    Label("Nothing matches", systemImage: "magnifyingglass")
+                } description: {
+                    Text(vm.openNowOnly
+                         ? "Nothing loaded so far is open right now."
+                         : "Try a different name or fewer filters.")
+                } actions: {
+                    // The filter runs over loaded pages, so "nothing open" can simply
+                    // mean "not far enough down the list yet".
+                    if vm.openNowOnly {
+                        Button("Load more places") { Task { await vm.loadMore() } }
+                            .buttonStyle(.bordered)
+                    }
+                }
             } else {
                 list
             }
@@ -205,15 +246,14 @@ struct PlaceCard: View {
                     .lineLimit(2)
 
                 HStack(spacing: 6) {
+                    // Score only in a dense list. The review count earns its place
+                    // on the detail screen and the map card, where it is a link into
+                    // Google's reviews rather than a number with nowhere to go.
                     if place.rating > 0 {
                         HStack(spacing: 3) {
                             Image(systemName: "star.fill")
                                 .font(.caption2).foregroundColor(.yellow)
                             Text(String(format: "%.1f", place.rating)).font(.caption)
-                            if place.reviewCount > 0 {
-                                Text("(\(place.reviewCount))")
-                                    .font(.caption2).foregroundColor(.secondary)
-                            }
                         }
                     }
                     if let price = place.priceRange {

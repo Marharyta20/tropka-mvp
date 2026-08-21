@@ -21,6 +21,17 @@ struct ExploreView: View {
     @State private var searchDebounce: Task<Void, Never>?
     @State private var showNewRoute = false
     @State private var categoryCounts: [CategoryCount] = []
+    @ObservedObject private var preferences = UserPreferences.shared
+
+    /// The tiles the user said they care about, first. Ordering only — every
+    /// category is still there, because hiding one the user did not ask to hide
+    /// makes the catalogue look smaller than it is.
+    private var orderedCategoryCounts: [CategoryCount] {
+        guard !preferences.interests.isEmpty else { return categoryCounts }
+        let picked = Set(preferences.interests)
+        return categoryCounts.filter { picked.contains($0.category) }
+             + categoryCounts.filter { !picked.contains($0.category) }
+    }
 
     private var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespaces).isEmpty
@@ -155,7 +166,7 @@ struct ExploreView: View {
         if vm.isLoading && vm.routes.isEmpty {
             ProgressView("Loading…").frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let msg = vm.errorMessage {
-            ErrorBlock(message: msg) { vm.loadRoutes() }
+            ExploreErrorBlock(message: msg) { vm.loadRoutes() }
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
@@ -202,7 +213,7 @@ struct ExploreView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(categoryCounts) { item in
+                    ForEach(orderedCategoryCounts) { item in
                         CategoryTile(category: item.category, count: item.count) {
                             openCategory(item.category)
                         }
@@ -314,7 +325,7 @@ private struct TagChip: View {
     }
 }
 
-private struct ErrorBlock: View {
+private struct ExploreErrorBlock: View {
     let message: String
     let retry: () -> Void
 

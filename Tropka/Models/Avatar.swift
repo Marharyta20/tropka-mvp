@@ -48,14 +48,26 @@ struct Avatar: Identifiable, Equatable, Hashable {
 struct AvatarView: View {
     let stored: String?
     var size: CGFloat = 72
+    /// Whose picture this is. Pass it wherever an *author's* avatar is drawn
+    /// from a cached list: when the author turns out to be the signed-in user,
+    /// the live value wins over the embedded copy, which is otherwise a snapshot
+    /// from whenever that list was fetched.
+    var userID: String? = nil
+
+    @ObservedObject private var preferences = UserPreferences.shared
+
+    private var shown: String? {
+        guard let userID, preferences.isMe(userID) else { return stored }
+        return preferences.avatarValue ?? stored
+    }
 
     var body: some View {
         Group {
-            if let preset = Avatar.preset(from: stored) {
+            if let preset = Avatar.preset(from: shown) {
                 Image(preset.assetName)
                     .resizable()
                     .scaledToFill()
-            } else if let url = Avatar.remoteURL(from: stored) {
+            } else if let url = Avatar.remoteURL(from: shown) {
                 AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image): image.resizable().scaledToFill()

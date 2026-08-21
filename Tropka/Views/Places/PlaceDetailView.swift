@@ -29,6 +29,13 @@ struct PlaceDetailView: View {
                     hero(shown)
                     header(shown)
                     actions(shown)
+                    if let summary = shown.summary {
+                        about(summary, place: shown)
+                    }
+                    if !shown.highlights.isEmpty {
+                        PlaceHighlightsRow(highlights: shown.highlights)
+                            .padding(.horizontal, 20)
+                    }
                     if !shown.tags.isEmpty { tagRow(shown) }
                     if let notes = shown.notes { tropkaNote(notes) }
                     if let description = shown.description { quote(description) }
@@ -37,6 +44,11 @@ struct PlaceDetailView: View {
                     relatedSection
                 }
                 .padding(.bottom, 32)
+            } else if let errorMessage {
+                ErrorBlock(message: errorMessage) {
+                    Task { await load() }
+                }
+                .padding(.top, 80)
             } else {
                 ProgressView().padding(.top, 80)
             }
@@ -87,15 +99,7 @@ struct PlaceDetailView: View {
                     .font(.caption)
                     .foregroundColor(Color(place.category.color))
 
-                if place.rating > 0 {
-                    HStack(spacing: 3) {
-                        Image(systemName: "star.fill").font(.caption2).foregroundColor(.yellow)
-                        Text(String(format: "%.1f", place.rating)).font(.caption)
-                        if place.reviewCount > 0 {
-                            Text("(\(place.reviewCount))").font(.caption2).foregroundColor(.secondary)
-                        }
-                    }
-                }
+                GoogleRating(rating: place.rating, sourceURL: place.sourceURL)
 
                 if let price = place.priceRange {
                     Text(price).font(.caption).foregroundColor(.secondary)
@@ -184,6 +188,42 @@ struct PlaceDetailView: View {
         .padding(.horizontal, 20)
     }
 
+    /// What the place is. Plain text, high on the screen, because it is the first
+    /// thing somebody deciding whether to walk there needs.
+    @ViewBuilder
+    private func about(_ text: String, place: PlaceDetails) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(text)
+                .font(.callout)
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            // CC BY-SA is not a formality: the licence is conditional on naming
+            // the source and making it reachable. The link carries the second
+            // half so the URL itself never has to be printed.
+            if let attribution = place.summaryAttribution {
+                if let url = place.summaryURL {
+                    Link(destination: url) {
+                        HStack(spacing: 3) {
+                            Text(attribution)
+                            Image(systemName: "arrow.up.right")
+                                .font(.system(size: 8, weight: .semibold))
+                        }
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    }
+                } else {
+                    Text(attribution)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    /// What somebody said about it. Italics and quotation marks belong here and
+    /// only here.
     private func quote(_ text: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("What people say")
@@ -277,13 +317,22 @@ struct PlaceDetailView: View {
 
     private func load() async {
         isLoadingRoutes = true
-        async let detailsTask = try? PlacesService.shared.details(id: placeID)
-        async let routesTask = try? PlacesService.shared.relatedRoutes(placeID: placeID)
+        errorMessage = nil
+        defer { isLoadingRoutes = false }
 
-        let (details, routes) = await (detailsTask, routesTask)
-        if let details { place = details }
-        relatedRoutes = routes ?? []
-        isLoadingRoutes = false
+        do {
+            async let detailsTask = PlacesService.shared.details(id: placeID)
+            async let routesTask = try? PlacesService.shared.relatedRoutes(placeID: placeID)
+
+            let (details, routes) = try await (detailsTask, routesTask)
+            place = details
+            relatedRoutes = routes ?? []
+        } catch {
+            // Only worth reporting when the screen would otherwise be blank. Opened
+            // from the feed, `preloaded` already carries enough to be useful, and an
+            // error over working content would be noise.
+            if preloaded == nil { errorMessage = error.localizedDescription }
+        }
     }
 }
 
@@ -316,7 +365,7 @@ private struct RelatedRouteRow: View {
                     .foregroundColor(.secondary)
                 if let author = route.authorName {
                     HStack(spacing: 4) {
-                        AvatarView(stored: route.authorAvatar, size: 16)
+                        AvatarView(stored: route.authorAvatar, size: 16, userID: route.authorUID)
                         Text("by \(author)").font(.caption2).foregroundColor(.secondary)
                     }
                 }

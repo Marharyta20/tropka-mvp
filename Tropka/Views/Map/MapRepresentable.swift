@@ -126,7 +126,8 @@ struct MapRepresentable: UIViewRepresentable {
             lastDrawnSignature = signature
 
             let total = parent.stops.count
-            pointManager.annotations = parent.stops.enumerated().map { index, stop in
+            pointManager.annotations = parent.stops.enumerated().compactMap { index, stop -> PointAnnotation? in
+                guard let coordinate = stop.location else { return nil }
                 let image = numberedPinImage(number: index + 1,
                                              name: stop.name,
                                              isFirst: index == 0,
@@ -135,14 +136,14 @@ struct MapRepresentable: UIViewRepresentable {
                 let id = "stop-\(index)-\(index == parent.selectedStopIndex ? "sel" : "idle")"
                 try? mapView.mapboxMap.addImage(image, id: id)
 
-                var annotation = PointAnnotation(coordinate: stop.location)
+                var annotation = PointAnnotation(coordinate: coordinate)
                 annotation.iconImage = id
                 annotation.iconAnchor = .bottom
                 annotation.iconSize = 1.0
                 return annotation
             }
 
-            let line = parent.routeCoords.isEmpty ? parent.stops.map(\.location) : parent.routeCoords
+            let line = parent.routeCoords.isEmpty ? parent.stops.compactMap(\.location) : parent.routeCoords
 
             // Stops land first, the walking path a moment later; frame both times.
             let routeSignature = "\(parent.stops.map(\.id).joined())|\(parent.routeCoords.count)"
@@ -176,7 +177,7 @@ struct MapRepresentable: UIViewRepresentable {
             // Frame the stops themselves, not just the walking line: the line runs
             // between them, so fitting it alone can leave the first and last pins
             // (and their name tags) hanging off the edge.
-            let line = parent.stops.map(\.location) + parent.routeCoords
+            let line = parent.stops.compactMap(\.location) + parent.routeCoords
 
             // The map draws edge to edge, so the padding has to account for what sits
             // on top of it: the title bar above, and below — the stop carousel, the
@@ -204,8 +205,9 @@ struct MapRepresentable: UIViewRepresentable {
         /// Ease rather than jump: on a walking route the relationship between two
         /// stops is the information, and a cut throws it away.
         func flyToSelected(on mapView: MapboxMaps.MapView) {
-            guard parent.stops.indices.contains(parent.selectedStopIndex) else { return }
-            let target = parent.stops[parent.selectedStopIndex].location
+            guard parent.stops.indices.contains(parent.selectedStopIndex),
+                  let target = parent.stops[parent.selectedStopIndex].location
+            else { return }
             let zoom = max(mapView.mapboxMap.cameraState.zoom, 15)
             mapView.camera.fly(to: CameraOptions(center: target, zoom: zoom), duration: 0.5)
         }

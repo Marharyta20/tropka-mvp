@@ -9,6 +9,10 @@ final class TipsViewModel: ObservableObject {
     @Published var tips: [Tip] = []
     @Published var isLoading = false
     @Published var isLoadingMore = false
+    /// False until the first page has come back. Without it the tab rendered
+    /// "Nothing found — try a different word" in the moment before the first
+    /// request had even started, to a user who had searched for nothing.
+    @Published private(set) var hasLoaded = false
     @Published var errorMessage: String?
 
     private var hasMore = true
@@ -79,7 +83,10 @@ final class TipsViewModel: ObservableObject {
     func reload() async {
         guard !isLoading else { return }
         isLoading = true
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoaded = true
+        }
 
         do {
             let rows: [TipRow] = try await supabase

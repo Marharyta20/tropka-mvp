@@ -239,8 +239,42 @@ struct RouteEditorService {
         try await supabase.from("route_stops").insert(rows).execute()
     }
 
+    /// Replaces a route's stops in a single transaction.
+    ///
+    /// This used to be a DELETE followed by a separate INSERT. If the insert
+    /// failed — the connection dropping between the two calls was enough — the
+    /// route was left with no stops at all, while `stops_count` had already been
+    /// written with the new number. The header then claimed "7 stops" over an
+    /// empty list and the author had no way back.
     private func replaceStops(routeID: String, stops: [DraftStop]) async throws {
-        try await supabase.from("route_stops").delete().eq("route_id", value: routeID).execute()
-        try await writeStops(routeID: routeID, stops: stops)
+        let rows = stops.enumerated().map { index, stop in
+            StopPayload(place_id: stop.placeID,
+                        order_index: index + 1,
+                        notes: stop.notes.isEmpty ? nil : stop.notes,
+                        photo_url: stop.photoURL?.absoluteString,
+                        time_spent: max(0, stop.timeSpent))
+        }
+
+        try await supabase
+            .rpc("replace_route_stops",
+                 params: ReplaceStopsParams(p_route_id: routeID, p_stops: rows))
+            .execute()
     }
+}
+
+// MARK: - RPC payloads
+
+/// Field names match the jsonb keys `replace_route_stops` reads, so they are
+/// snake_case on purpose.
+private struct StopPayload: Encodable {
+    let place_id: Int
+    let order_index: Int
+    let notes: String?
+    let photo_url: String?
+    let time_spent: Int
+}
+
+private struct ReplaceStopsParams: Encodable {
+    let p_route_id: String
+    let p_stops: [StopPayload]
 }

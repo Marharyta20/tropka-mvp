@@ -30,7 +30,17 @@ struct PlaceSheet: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
+                        if let summary = details?.summary {
+                            Text(summary)
+                                .font(.callout)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 20)
+                        }
                         photo
+                        if let highlights = details?.highlights, !highlights.isEmpty {
+                            PlaceHighlightsRow(highlights: highlights)
+                                .padding(.horizontal, 20)
+                        }
                         if let tags = details?.tags, !tags.isEmpty { tagRow(tags) }
                         if let notes = details?.notes { tropkaNote(notes) }
                         relatedSection
@@ -76,15 +86,7 @@ struct PlaceSheet: View {
                     .font(.caption)
                     .foregroundColor(Color(place.category.color))
 
-                if place.rating > 0 {
-                    HStack(spacing: 3) {
-                        Image(systemName: "star.fill").font(.caption2).foregroundColor(.yellow)
-                        Text(String(format: "%.1f", place.rating)).font(.caption)
-                        if place.reviewCount > 0 {
-                            Text("(\(place.reviewCount))").font(.caption2).foregroundColor(.secondary)
-                        }
-                    }
-                }
+                GoogleRating(rating: place.rating, sourceURL: details?.sourceURL)
 
                 if let isOpen = details?.isOpenNow {
                     Text(isOpen ? "Open now" : "Closed")

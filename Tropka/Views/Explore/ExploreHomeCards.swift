@@ -36,7 +36,7 @@ struct FeaturedRouteCard: View {
                 HStack(spacing: 10) {
                     if let author = route.authorName {
                         HStack(spacing: 5) {
-                            AvatarView(stored: route.authorAvatar, size: 20)
+                            AvatarView(stored: route.authorAvatar, size: 20, userID: route.authorUID)
                             Text(author)
                         }
                     }

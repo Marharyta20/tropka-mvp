@@ -22,10 +22,14 @@ struct TipsView: View {
                     ContentUnavailableView("Couldn't load tips",
                                            systemImage: "exclamationmark.triangle",
                                            description: Text(errorMessage))
-                } else if visibleTips.isEmpty && !vm.isLoading {
-                    ContentUnavailableView("Nothing found",
-                                           systemImage: "magnifyingglass",
-                                           description: Text("Try a different word."))
+                } else if !vm.hasLoaded || (vm.isLoading && vm.tips.isEmpty) {
+                    ProgressView()
+                } else if visibleTips.isEmpty {
+                    ContentUnavailableView(searchText.isEmpty ? "No tips yet" : "Nothing found",
+                                           systemImage: searchText.isEmpty ? "lightbulb" : "magnifyingglass",
+                                           description: Text(searchText.isEmpty
+                                                             ? "New tips will show up here."
+                                                             : "Try a different word."))
                 } else {
                     list
                 }

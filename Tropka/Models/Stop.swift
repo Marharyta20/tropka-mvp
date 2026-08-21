@@ -12,14 +12,19 @@ struct Stop: Identifiable, Equatable {
     let name: String
     /// Mirrors the place's category — used for the fallback thumbnail.
     let category: PlaceCategory
-    let lat: Double
-    let lng: Double
+    /// Nullable in `places`, so nullable here. A stop the catalogue has no
+    /// coordinates for still belongs in the list — it just cannot be drawn.
+    /// Declaring these non-optional made one such row throw during decoding and
+    /// take the entire route's stop list with it.
+    let lat: Double?
+    let lng: Double?
     let orderIndex: Int
     let timeSpent: Int
     let photoURL: URL?
     let notes: String?
 
-    var location: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: lat, longitude: lng)
+    var location: CLLocationCoordinate2D? {
+        guard let lat, let lng else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lng)
     }
 }

@@ -21,12 +21,13 @@ struct ProfileView: View {
     @State private var showAvatarPicker = false
 
     enum Tab: CaseIterable {
-        case saved, created, reviews
+        case saved, created, walked, reviews
 
         var title: String {
             switch self {
             case .saved:   return "Saved"
             case .created: return "Created"
+            case .walked:  return "Walked"
             case .reviews: return "Reviews"
             }
         }
@@ -39,6 +40,13 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
                     .padding(.horizontal, 20)
+                if let errorMessage = vm.errorMessage {
+                    ErrorBanner(message: errorMessage) {
+                        Task { await vm.fetchAll() }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                }
                 actionRow
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
@@ -170,6 +178,7 @@ struct ProfileView: View {
         switch tab {
         case .saved:   return vm.routes.count
         case .created: return vm.createdRoutes.count
+        case .walked:  return vm.walkedRoutes.count
         case .reviews: return vm.myReviews.count
         }
     }
@@ -187,6 +196,10 @@ struct ProfileView: View {
                                 .font(.subheadline)
                                 .fontWeight(selectedTab == tab ? .semibold : .regular)
                                 .foregroundColor(selectedTab == tab ? .primary : .secondary)
+                                // Four tabs plus their count pills is a tight fit
+                                // on the narrowest phones.
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                             if count(for: tab) > 0 {
                                 Text("\(count(for: tab))")
                                     .font(.caption2.bold())
@@ -228,6 +241,7 @@ struct ProfileView: View {
         switch selectedTab {
         case .saved:   savedList
         case .created: createdList
+        case .walked:  walkedList
         case .reviews: reviewsList
         }
     }
@@ -282,6 +296,32 @@ struct ProfileView: View {
 
     // MARK: - Created
 
+    /// Everything the user has actually finished. Saved is what they might do;
+    /// this is what they did.
+    private var walkedList: some View {
+        List {
+            ForEach(vm.walkedRoutes) { route in
+                NavigationLink {
+                    TourDetailsView(route: route, source: .profile)
+                } label: {
+                    RouteRow(route: route)
+                }
+                .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
+                .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.plain)
+        .overlay {
+            if vm.walkedRoutes.isEmpty {
+                ContentUnavailableView("Nothing walked yet",
+                                       systemImage: "figure.walk",
+                                       description: Text("Mark a route as walked on its page and it shows up here."))
+            }
+        }
+        .task { await vm.fetchWalkedRoutes() }
+        .refreshable { await vm.fetchWalkedRoutes() }
+    }
+
     private var createdList: some View {
         List {
             // Lives inside the list it adds to, rather than in the navigation bar
@@ -323,7 +363,7 @@ struct ProfileView: View {
                 ContentUnavailableView {
                     Label("No routes yet", systemImage: "map")
                 } description: {
-                    Text("Build one from places you like — the + button is up top.")
+                    Text("Pick places you like on the map, then put them in order.")
                 } actions: {
                     Button("New route") {
                         Analytics.track(.routeEditorOpened, [
@@ -429,6 +469,12 @@ private struct RouteRow: View {
     var caption: String?
     var showsStatus = false
 
+    /// Read from the shared store rather than passed in, so a route marked walked
+    /// anywhere in the app is marked here too, on every tab it appears on.
+    @ObservedObject private var walkedStore = WalkedRoutesStore.shared
+
+    private var isWalked: Bool { walkedStore.contains(route.id) }
+
     var body: some View {
         HStack(spacing: 12) {
             cover
@@ -456,12 +502,16 @@ private struct RouteRow: View {
                 .foregroundColor(.secondary)
                 .lineLimit(1)
 
-                if showsStatus, route.status != .public {
-                    RouteStatusBadge(status: route.status)
-                } else if let caption {
-                    Text(caption)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    if isWalked { WalkedBadge() }
+
+                    if showsStatus, route.status != .public {
+                        RouteStatusBadge(status: route.status)
+                    } else if let caption {
+                        Text(caption)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
 

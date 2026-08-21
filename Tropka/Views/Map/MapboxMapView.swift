@@ -103,6 +103,12 @@ struct MapboxMapView: UIViewRepresentable {
         private var renderedSignature = ""
         /// The group currently spread open, if any.
         private var openGroup: Group?
+        /// Set by an annotation's own tap handler. The map-level `TapInteraction`
+        /// is registered after the annotations and therefore runs after them, so
+        /// without this the same finger press is delivered twice: once to the pin
+        /// and once to the map, which then hunts for the nearest pin and finds the
+        /// same one. Two camera animations start, and the second cancels the first.
+        private var tapHandledByAnnotation = false
 
         /// Two places closer than this share a marker. It is a little wider than a
         /// pin, so drawn pins never overlap.
@@ -110,6 +116,9 @@ struct MapboxMapView: UIViewRepresentable {
         /// Below this zoom a tapped group is resolved by moving the camera; at or
         /// above it, zooming stops helping and the members are spread instead.
         private static let spreadZoom: CGFloat = 17
+        /// Closer together than this and no amount of zooming pulls the pins apart
+        /// at the grouping radius — they are in one building.
+        private static let inseparableSpanM: Double = 25
         /// How far the members fly out when a group opens.
         private let spreadRadiusPx: CGFloat = 62
         private let maxMarkers = 700
@@ -303,7 +312,22 @@ struct MapboxMapView: UIViewRepresentable {
                 items = layout(places, zoom: Double(step) / 2)
             }
 
-            let signature = "\(cachedZoomStep)|\(items.count)|\(places.count)|\(openGroup?.id ?? "-")"
+            var signature = "\(cachedZoomStep)|\(items.count)|\(places.count)|\(openGroup?.id ?? "-")"
+            if let openGroup {
+                // A ring is placed in screen space, so it has to be redrawn when
+                // the camera moves under it — and *only* then.
+                //
+                // Skipping the gate entirely while a group was open was wrong:
+                // `onMapIdle` fires repeatedly, including after tile loads with a
+                // motionless camera, and every one of those reassigned
+                // `annotations`, which tears the layer down and rebuilds it. That
+                // is the blinking. Folding the group's screen position into the
+                // signature instead means a still camera produces a stable
+                // signature and nothing is reassigned, while any real camera
+                // movement changes it and the ring follows.
+                let centre = mapView.mapboxMap.point(for: openGroup.coordinate)
+                signature += "|\(Int(centre.x.rounded()))x\(Int(centre.y.rounded()))"
+            }
             guard signature != renderedSignature else { return }
             renderedSignature = signature
 
@@ -415,6 +439,13 @@ struct MapboxMapView: UIViewRepresentable {
         // MARK: Taps
 
         private func handleMapTap(at point: CGPoint) {
+            // The pin already dealt with this press. Anything below would be a
+            // second, spurious handling of one tap.
+            if tapHandledByAnnotation {
+                tapHandledByAnnotation = false
+                return
+            }
+
             // A tap anywhere else closes an open group — the same gesture that opened
             // it puts it back.
             if openGroup != nil {
@@ -456,14 +487,32 @@ struct MapboxMapView: UIViewRepresentable {
         ///
         /// While there is room to zoom, that is the answer: the group breaks into
         /// smaller ones on its own, and the result stays readable. Spreading members
-        /// onto a ring is reserved for the case zooming cannot fix — places that share
-        /// the same doorway — because a ring of pins laid over the neighbours is
-        /// exactly the mess it was meant to avoid.
+        /// onto a ring is reserved for the case zooming cannot fix, because a ring of
+        /// pins laid over the neighbours is exactly the mess it was meant to avoid.
+        ///
+        /// Two things here were wrong before and both made the ring unreachable:
+        ///
+        /// The zoom test was exact. Tapping eased the camera to `min(zoom + 2,
+        /// spreadZoom)`, i.e. to 17 precisely, and the map settles a hair under the
+        /// value it was asked for — so `zoom >= 17` stayed false and every further
+        /// tap re-ran the same zoom that was already finished. That is the "it goes
+        /// all the way in and then nothing" case.
+        ///
+        /// And a group of places sharing one doorway is never separated by zooming
+        /// at all, however far in you go, so making the user tap twice to find that
+        /// out was pointless. If the members sit within a few metres of each other,
+        /// the ring is the only possible answer and it opens straight away.
         private func open(_ group: Group) {
             guard let mapView else { return }
             let zoom = mapView.mapboxMap.cameraState.zoom
+            let span = Self.span(of: group)
 
-            guard zoom >= Self.spreadZoom else {
+            // A hair of tolerance: the camera settles near the value it was asked
+            // for, not on it.
+            let zoomedInEnough = zoom >= Self.spreadZoom - 0.05
+            let zoomCannotHelp = span <= Self.inseparableSpanM
+
+            guard zoomedInEnough || zoomCannotHelp else {
                 Analytics.track(.mapZoomed, [
                     "direction": "in",
                     "reason": "group_tapped",
@@ -476,13 +525,35 @@ struct MapboxMapView: UIViewRepresentable {
                 return
             }
 
-            Analytics.track(.mapGroupOpened, ["member_count": group.members.count])
-            // Centre first so the ring has room, then spread.
-            mapView.camera.ease(to: CameraOptions(center: group.coordinate), duration: 0.35) { [weak self] _ in
-                guard let self else { return }
-                self.openGroup = group
-                self.render()
+            Analytics.track(.mapGroupOpened, [
+                "member_count": group.members.count,
+                "reason": zoomCannotHelp ? "same_doorway" : "max_zoom"
+            ])
+
+            // Opened now, not in the animation's completion. A completion that is
+            // dropped when a second animation cancels the first left the ring
+            // permanently unopened; drawing immediately cannot be lost. The ring's
+            // positions are screen-space, so `render()` redraws it when the camera
+            // settles — see the signature gate.
+            openGroup = group
+            render()
+            mapView.camera.ease(to: CameraOptions(center: group.coordinate), duration: 0.35)
+        }
+
+        /// The widest gap between members, in metres.
+        private static func span(of group: Group) -> Double {
+            let coordinates = group.members.map(\.coordinates)
+            guard coordinates.count > 1 else { return 0 }
+            let latitude = 52.23 * .pi / 180
+            var widest: Double = 0
+            for i in coordinates.indices {
+                for j in coordinates.indices where j > i {
+                    let dLat = (coordinates[i].latitude - coordinates[j].latitude) * 111_320
+                    let dLng = (coordinates[i].longitude - coordinates[j].longitude) * 111_320 * cos(latitude)
+                    widest = max(widest, (dLat * dLat + dLng * dLng).squareRoot())
+                }
             }
+            return widest
         }
 
         // MARK: Annotations
@@ -498,6 +569,7 @@ struct MapboxMapView: UIViewRepresentable {
                 annotation.textField = place.name
             }
             annotation.tapHandler = { [weak self] _ in
+                self?.tapHandledByAnnotation = true
                 self?.onPinTapped?(place)
                 return true
             }
@@ -510,6 +582,7 @@ struct MapboxMapView: UIViewRepresentable {
                                                             categories: group.members.map(\.category)),
                                      name: "group-\(group.members.count)-\(group.members.first?.category.rawValue ?? 0)")
             annotation.tapHandler = { [weak self] _ in
+                self?.tapHandledByAnnotation = true
                 self?.open(group)
                 return true
             }

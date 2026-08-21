@@ -37,13 +37,19 @@ final class SavedRoutesStore: ObservableObject {
             enum CodingKeys: String, CodingKey { case routeId = "route_id" }
         }
 
-        let rows: [IDRow] = (try? await supabase
-            .from("saved_routes")
-            .select("route_id")
-            .eq("user_id", value: uid)
-            .execute()
-            .value) ?? []
-
-        savedIDs = Set(rows.map(\.routeId))
+        do {
+            let rows: [IDRow] = try await supabase
+                .from("saved_routes")
+                .select("route_id")
+                .eq("user_id", value: uid)
+                .execute()
+                .value
+            savedIDs = Set(rows.map(\.routeId))
+        } catch {
+            // Keep whatever we already know. Clearing the set on a network failure
+            // unfilled every bookmark in Explore and hid the review button on a
+            // route the user had definitely saved.
+            print("SavedRoutesStore: refresh failed:", error)
+        }
     }
 }

@@ -236,7 +236,7 @@ struct TourDetailsView: View {
 
             HStack(spacing: 8) {
                 if let author = shown.authorName {
-                    AvatarView(stored: shown.authorAvatar, size: 26)
+                    AvatarView(stored: shown.authorAvatar, size: 26, userID: shown.authorUID)
                     Text(author)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -269,6 +269,15 @@ struct TourDetailsView: View {
             if let walkingDistance {
                 Text("·")
                 Text(walkingDistance)
+            }
+            // The user's own state, not a tally. `routes.completed_count` counts
+            // how many people finished the route, but next to a rating and a
+            // duration a bare number reads as "walked once" rather than "walked by
+            // one person". It keeps accumulating in the database and can be shown
+            // as social proof when there are enough users for it to mean anything.
+            if vm.isWalked {
+                Text("·")
+                Text("Walked").foregroundColor(.green)
             }
             Spacer(minLength: 0)
         }
@@ -322,6 +331,10 @@ struct TourDetailsView: View {
 
             if vm.isLoading {
                 ProgressView().frame(maxWidth: .infinity).padding(32)
+            } else if let errorMsg = vm.errorMsg, vm.stops.isEmpty {
+                ErrorBlock(message: errorMsg) {
+                    Task { await vm.load(routeID: route.id) }
+                }
             } else if vm.stops.isEmpty {
                 Text("No stops added yet")
                     .foregroundColor(.secondary)
@@ -360,8 +373,10 @@ struct TourDetailsView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                // Reviewing is for people who kept the route; the author rates nothing.
-                if vm.isSaved {
+                // Anyone but the author may review. This used to require a
+                // bookmark, so someone who walked the route without saving it had
+                // no way to say anything about it.
+                if !isAuthor {
                     Button(vm.myReview == nil ? "Write" : "Edit") {
                         Analytics.track(.reviewFormOpened, [
                             "route_id": route.id,
@@ -395,26 +410,59 @@ struct TourDetailsView: View {
 
     /// The one thing this screen is for.
     private var startBar: some View {
-        Button {
-            Analytics.track(.routeMapOpened, [
-                "route_id": route.id,
-                "route_title": route.title,
-                "stops_count": vm.stops.count
-            ])
-            showMap = true
-        } label: {
-            Label("Start walking", systemImage: "figure.walk")
-                .font(.subheadline.bold())
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.blue, in: RoundedRectangle(cornerRadius: 14))
-                .foregroundColor(.white)
+        HStack(spacing: 10) {
+            Button {
+                Analytics.track(.routeMapOpened, [
+                    "route_id": route.id,
+                    "route_title": route.title,
+                    "stops_count": vm.stops.count
+                ])
+                showMap = true
+            } label: {
+                Label("Start walking", systemImage: "figure.walk")
+                    .font(.subheadline.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.blue, in: RoundedRectangle(cornerRadius: 14))
+                    .foregroundColor(.white)
+            }
+            .buttonStyle(.plain)
+
+            if !isAuthor { walkedButton }
         }
-        .buttonStyle(.plain)
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, 10)
         .background(.ultraThinMaterial)
+    }
+
+    /// A route is not finished when the map opens, it is finished when the walker
+    /// says so — and that is the one moment they have something to write a review
+    /// about, which is why the sheet follows.
+    private var walkedButton: some View {
+        Button {
+            Task {
+                let wasWalked = vm.isWalked
+                await vm.setWalked(!wasWalked, routeID: route.id)
+                if !wasWalked, vm.isWalked, vm.myReview == nil {
+                    Analytics.track(.reviewFormOpened, [
+                        "route_id": route.id,
+                        "is_edit": false,
+                        "source": "walked"
+                    ])
+                    showReviewSheet = true
+                }
+            }
+        } label: {
+            Image(systemName: vm.isWalked ? "checkmark.circle.fill" : "checkmark.circle")
+                .font(.title3)
+                .frame(width: 54, height: 50)
+                .background(vm.isWalked ? Color.green.opacity(0.15) : Color(.systemGray6),
+                            in: RoundedRectangle(cornerRadius: 14))
+                .foregroundColor(vm.isWalked ? .green : .primary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(vm.isWalked ? "Walked" : "Mark as walked")
     }
 }
 
@@ -482,7 +530,7 @@ private struct PublicReviewRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            AvatarView(stored: review.authorAvatar, size: 36)
+            AvatarView(stored: review.authorAvatar, size: 36, userID: review.userID)
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {

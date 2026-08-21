@@ -15,6 +15,9 @@ final class TourDetailsViewModel: ObservableObject {
 
     @Published var routeCoords: [CLLocationCoordinate2D] = []
     @Published var isSaved = false
+    /// Whether the signed-in user has marked this route as walked. Separate from
+    /// `isSaved` on purpose: a bookmark says "I might", this says "I did".
+    @Published var isWalked = false
     @Published var myReview: UserReview? = nil
     /// Every review on this route, author included — shown to everyone.
     @Published var reviews: [UserReview] = []
@@ -23,6 +26,7 @@ final class TourDetailsViewModel: ObservableObject {
     @Published var navigationRoutes: NavigationRoutes?
 
     private let saveSvc = SavedRoutesService()
+    private let walkSvc = RouteCompletionService()
     private let reviewSvc = ReviewService()
 
     private let navigationProvider = NavigationContainer.shared.provider
@@ -35,13 +39,15 @@ final class TourDetailsViewModel: ObservableObject {
         await loadReviews(routeID: routeID)
 
         async let savedTask = saveSvc.isSaved(routeID: routeID)
+        async let walkedTask = try? walkSvc.isWalked(routeID: routeID)
         async let reviewTask = fetchMyReview(routeID: routeID)
         async let stopsTask = fetchStops(routeID: routeID)
 
         do {
-            let (isSaved, review, stops) = try await (savedTask, reviewTask, stopsTask)
+            let (isSaved, isWalked, review, stops) = try await (savedTask, walkedTask, reviewTask, stopsTask)
 
             self.isSaved = isSaved
+            self.isWalked = isWalked ?? false
             self.myReview = review
             self.stops = stops
 
@@ -93,6 +99,32 @@ final class TourDetailsViewModel: ObservableObject {
         }
     }
 
+    /// Marks the route walked, or takes the mark back.
+    ///
+    /// The flag flips first and rolls back on failure, like the bookmark; the
+    /// route header is then re-read so `completed_count` on screen matches what
+    /// the trigger just wrote.
+    func setWalked(_ walked: Bool, routeID: String) async {
+        guard walked != isWalked else { return }
+        let previous = isWalked
+        isWalked = walked
+        do {
+            if walked {
+                try await walkSvc.markWalked(routeID: routeID)
+            } else {
+                try await walkSvc.unmarkWalked(routeID: routeID)
+            }
+            // Every card showing this route updates from here, without refetching.
+            // Nothing on screen reads completed_count any more, so there is no
+            // reason to re-read the route header after a mark.
+            WalkedRoutesStore.shared.set(walked, routeID: routeID)
+            Analytics.track(walked ? .routeWalked : .routeUnwalked, ["route_id": routeID])
+        } catch {
+            isWalked = previous
+            errorMsg = error.localizedDescription
+        }
+    }
+
     func saveReview(_ review: UserReview) async {
         do {
             self.myReview = try await reviewSvc.upsert(review: review)
@@ -112,7 +144,7 @@ final class TourDetailsViewModel: ObservableObject {
 
     // Builds routes the way Navigation SDK v3 expects them — via routingProvider.
     func buildWalkingRoute() async {
-        let waypoints = stops.map { Waypoint(coordinate: $0.location) }
+        let waypoints = stops.compactMap(\.location).map { Waypoint(coordinate: $0) }
         guard waypoints.count >= 2 else { return }
 
         let options = NavigationRouteOptions(waypoints: waypoints, profileIdentifier: .walking)

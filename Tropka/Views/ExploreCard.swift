@@ -83,18 +83,32 @@ struct ExploreCard: View {
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(alignment: .topTrailing) { saveButton }
+        .overlay(alignment: .bottomLeading) {
+            if vm.isWalked {
+                WalkedBadge(onCover: true).padding(10)
+            }
+        }
     }
 
     private var saveButton: some View {
         Button {
             Task {
-                let saved = await vm.toggle()
-                Analytics.track(saved ? .routeSaved : .routeUnsaved, [
+                let properties: [String: Any] = [
                     "route_id": route.id,
                     "route_title": route.title,
                     "source": Analytics.Source.explore.rawValue
-                ])
-                toastText = saved ? "Saved to your routes" : "Removed from your routes"
+                ]
+                switch await vm.toggle() {
+                case .saved:
+                    Analytics.track(.routeSaved, properties)
+                    toastText = "Saved to your routes"
+                case .removed:
+                    Analytics.track(.routeUnsaved, properties)
+                    toastText = "Removed from your routes"
+                case let .failed(message):
+                    // No analytics event: nothing was saved or unsaved.
+                    toastText = message
+                }
                 showToast = true
             }
         } label: {
@@ -116,7 +130,7 @@ struct ExploreCard: View {
     private var metaRow: some View {
         HStack(spacing: 6) {
             if let author = route.authorName {
-                AvatarView(stored: route.authorAvatar, size: 20)
+                AvatarView(stored: route.authorAvatar, size: 20, userID: route.authorUID)
                 Text(author)
                     .lineLimit(1)
                 Text("·")

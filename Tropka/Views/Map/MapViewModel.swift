@@ -11,6 +11,9 @@ import Foundation
 @MainActor
 final class MapViewModel: ObservableObject {
     @Published var places: [Place] = []
+    /// Rendered by `MapScreenView`. A silent failure here left the user looking at
+    /// an empty Warsaw with nothing to explain it.
+    @Published private(set) var loadError: String?
     @Published var searchQuery = ""
     @Published var selectedCategories = Set(PlaceCategory.allCases)
     @Published private var debouncedQuery = ""
@@ -41,9 +44,12 @@ final class MapViewModel: ObservableObject {
     /// Categories that actually exist in the loaded data, most common first — a chip
     /// for a category with no places is a dead end.
     var availableCategories: [PlaceCategory] {
-        Dictionary(grouping: places, by: \.category)
+        let byFrequency = Dictionary(grouping: places, by: \.category)
             .sorted { $0.value.count > $1.value.count }
             .map(\.key)
+        // The user's own categories come first, then the rest by how common they
+        // are. Ordering only — no chip disappears.
+        return UserPreferences.shared.ranked(byFrequency)
     }
 
     func isolated(_ category: PlaceCategory) -> Bool {
@@ -58,16 +64,27 @@ final class MapViewModel: ObservableObject {
 
     // MARK: - Loading
 
-    func loadPlaces() {
+    func loadPlaces(force: Bool = false) {
+        if force { places = [] }
         guard places.isEmpty else { return }
-        Task {
+        // The catalogue arrives in pages, so the initial load runs for a while.
+        // Without holding on to the task, leaving and re-entering the Map tab
+        // during it started a second full pagination loop over the same rows.
+        guard loadTask == nil else { return }
+
+        loadError = nil
+        loadTask = Task { [weak self] in
+            guard let self else { return }
+            defer { self.loadTask = nil }
             do {
-                places = try await fetchAllPlaces()
+                self.places = try await self.fetchAllPlaces()
             } catch {
-                print("MapViewModel: failed to load places:", error)
+                self.loadError = error.localizedDescription
             }
         }
     }
+
+    private var loadTask: Task<Void, Never>?
 
     private struct PlaceRow: Decodable {
         let id: Int

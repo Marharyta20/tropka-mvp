@@ -63,8 +63,8 @@ final class SupabaseService {
 
             struct PlaceInfo: Decodable {
                 let name: String
-                let lat: Double
-                let lng: Double
+                let lat: Double?
+                let lng: Double?
                 let photoUrl: String?
                 let categoryId: Int?
 

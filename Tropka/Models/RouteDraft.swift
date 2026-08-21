@@ -40,8 +40,13 @@ struct DraftStop: Identifiable, Equatable {
 // MARK: - RouteDraftStore
 
 /// Holds stops collected outside the editor — today that means the "Add to route"
-/// button on the map's place sheet. The editor drains this on open, so a user can
-/// wander the map, tap a few places, then go build the route from them.
+/// button on the map's place sheet. A user can wander the map, tap a few places,
+/// then go build the route from them.
+///
+/// The editor *copies* this on open and the store is cleared only once a route
+/// has actually been created. There is deliberately no `drain()`: handing the
+/// stops over and emptying the store in one step meant that opening the editor
+/// and backing out lost everything the author had collected.
 @MainActor
 final class RouteDraftStore: ObservableObject {
     static let shared = RouteDraftStore()
@@ -67,12 +72,6 @@ final class RouteDraftStore: ObservableObject {
 
     func remove(placeID: Int) {
         stops.removeAll { $0.placeID == placeID }
-    }
-
-    /// Hands the collected stops over and empties the store.
-    func drain() -> [DraftStop] {
-        defer { stops.removeAll() }
-        return stops
     }
 
     func clear() {

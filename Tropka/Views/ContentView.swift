@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var authVM = AuthViewModel()
+    @ObservedObject private var preferences = UserPreferences.shared
 
     var body: some View {
         Group {
@@ -19,6 +20,21 @@ struct ContentView: View {
             }
         }
         .animation(.default, value: authVM.state)
+        // Presented from the root rather than from the tab view: SwiftUI warns
+        // about reparenting when a cover is attached to a TabView, and routing
+        // belongs here anyway.
+        //
+        // A cover rather than a fourth branch of the switch: a returning user
+        // never sees a flicker of setup while the flag is still being read, and
+        // a new account gets it the moment sign-up succeeds.
+        .fullScreenCover(isPresented: Binding(
+            get: { authVM.state == .signedIn && preferences.needsOnboarding },
+            set: { _ in })
+        ) {
+            OnboardingView {
+                Task { await preferences.refresh() }
+            }
+        }
     }
 
     private var launchScreen: some View {

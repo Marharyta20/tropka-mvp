@@ -78,6 +78,10 @@ final class AuthViewModel: ObservableObject {
         Task {
             do {
                 try await AuthService.shared.signUp(email: email, password: password, fullName: fullName)
+                // The only path that creates an account which has not been set
+                // up. Flipping the flag here means setup appears immediately
+                // rather than after `users` has been read back.
+                UserPreferences.shared.markNeedsOnboarding()
                 Analytics.track(.signedUp)
             } catch {
                 Analytics.track(.authFailed, ["mode": "sign_up", "reason": error.localizedDescription])

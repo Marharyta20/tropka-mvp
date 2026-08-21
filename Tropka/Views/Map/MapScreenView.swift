@@ -47,7 +47,10 @@ struct MapScreenView: View {
             VStack(spacing: 10) {
                 searchField
                 categoryChips
-                if !searchText.isEmpty && vm.filteredPlaces.isEmpty {
+                if let loadError = vm.loadError {
+                    ErrorBanner(message: loadError) { vm.loadPlaces(force: true) }
+                }
+                if !searchText.isEmpty && vm.filteredPlaces.isEmpty && vm.loadError == nil {
                     Text("Nothing matches \"\(searchText)\"")
                         .font(.caption)
                         .padding(.horizontal, 12)

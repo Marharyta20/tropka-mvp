@@ -19,6 +19,9 @@ struct TourRoute: Identifiable, Equatable, Codable {
     let rating: Double
     let reviewCount: Int
     let stopsCount: Int
+    /// How many people have marked this route as walked. Maintained by a trigger
+    /// on `route_completions`, so it costs nothing to read here.
+    let completedCount: Int
     let tags: [String]
     let thumbnailURL: URL?  // decoded from thumbnail_url text column
 
@@ -54,6 +57,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         case rating
         case reviewCount = "review_count"
         case stopsCount  = "stops_count"
+        case completedCount = "completed_count"
         case tags
         case thumbnailURL = "thumbnail_url"
     }
@@ -72,6 +76,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         rating      = (try? c.decodeIfPresent(Double.self, forKey: .rating)) ?? 0
         reviewCount = (try? c.decodeIfPresent(Int.self, forKey: .reviewCount)) ?? 0
         stopsCount  = (try? c.decodeIfPresent(Int.self, forKey: .stopsCount)) ?? 0
+        completedCount = (try? c.decodeIfPresent(Int.self, forKey: .completedCount)) ?? 0
         tags        = (try? c.decodeIfPresent([String].self, forKey: .tags)) ?? []
         let urlStr  = try? c.decodeIfPresent(String.self, forKey: .thumbnailURL)
         thumbnailURL = urlStr.flatMap(URL.init)
@@ -97,6 +102,7 @@ struct TourRoute: Identifiable, Equatable, Codable {
         try c.encode(rating, forKey: .rating)
         try c.encode(reviewCount, forKey: .reviewCount)
         try c.encode(stopsCount, forKey: .stopsCount)
+        try c.encode(completedCount, forKey: .completedCount)
         try c.encode(tags, forKey: .tags)
         try c.encodeIfPresent(thumbnailURL?.absoluteString, forKey: .thumbnailURL)
         // authorName and authorAvatar are derived from a join, never written back.
