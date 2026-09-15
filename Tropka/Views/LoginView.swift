@@ -30,7 +30,7 @@ struct LoginView: View {
                     mark
                         .padding(.top, 40)
                         .padding(.bottom, 28)
-                    card
+                    form
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
@@ -71,27 +71,30 @@ struct LoginView: View {
         }
     }
 
-    // MARK: - Card
+    // MARK: - Form
 
-    private var card: some View {
+    private var form: some View {
         VStack(spacing: 16) {
-            Text(isSignUpMode ? "Create your account" : "Welcome back")
-                .font(.title3.bold())
-                .frame(maxWidth: .infinity, alignment: .leading)
-
+            // Only sign-up gets a heading. Log-in used to say "Welcome back",
+            // which is a guess — the screen opens in log-in mode for somebody
+            // who has never been here either, and the mark above already says
+            // whose app this is.
             if isSignUpMode {
-                TropkaField(title: "FULL NAME", icon: "person") {
-                    TextField("Anna Kowalska", text: $authVM.fullName)
+                Text("Create your account")
+                    .font(.title3.bold())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                TropkaField(title: "NAME", icon: "person") {
+                    TextField("", text: $authVM.fullName, prompt: .hint("Anna"))
                         .textInputAutocapitalization(.words)
                         .focused($focused, equals: .name)
                         .submitLabel(.next)
                         .onSubmit { focused = .email }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
             TropkaField(title: "EMAIL", icon: "envelope") {
-                TextField("you@example.com", text: $authVM.email)
+                TextField("", text: $authVM.email, prompt: .hint("you@example.com"))
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.emailAddress)
@@ -102,8 +105,32 @@ struct LoginView: View {
             }
 
             TropkaField(title: "PASSWORD", icon: "lock") {
-                SecureField("At least 6 characters", text: $authVM.password)
-                    .textContentType(isSignUpMode ? .newPassword : .password)
+                // `.password` in both modes, deliberately — not `.newPassword`
+                // on sign-up.
+                //
+                // `.newPassword` turns on Automatic Strong Passwords, which
+                // Apple only supports for an app associated with a domain via
+                // the Associated Domains entitlement (`webcredentials:`). This
+                // target has no entitlements file at all, so iOS would start
+                // the flow with nowhere to save the result: it paints the field
+                // with the system AutoFill highlight and locks it as
+                // "autofilled", while the generated password never reaches our
+                // binding — a yellow field that is empty and will not accept a
+                // tap. Focusing the password first made it happen because with
+                // no username filled in yet, that takeover is the only path
+                // iOS has; filling top to bottom first gave it a username and
+                // sent it down the ordinary save-credentials path instead.
+                //
+                // The content type is also constant now rather than switched on
+                // `isSignUpMode`. Changing it on a live field makes UIKit
+                // rebuild the text input underneath SwiftUI, which is its own
+                // source of stuck fields.
+                //
+                // Worth revisiting once tropka.app is real and hosting an
+                // apple-app-site-association file; until then strong passwords
+                // cost more than they give.
+                SecureField("", text: $authVM.password, prompt: .hint("At least 6 characters"))
+                    .textContentType(.password)
                     .focused($focused, equals: .password)
                     .submitLabel(.go)
                     .onSubmit(submit)
@@ -151,12 +178,7 @@ struct LoginView: View {
             .font(.footnote)
             .padding(.top, 2)
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.10), radius: 24, y: 10)
-        )
+        .padding(.horizontal, 4)
     }
 
     private func submit() {

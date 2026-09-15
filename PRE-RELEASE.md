@@ -68,6 +68,16 @@ says what is blocked, why it was left for later, and what to do about it.
 - **Do when:** before the App Store build — delete the `zoomButton` helper, the two
   triggers, and `zoomIfNeeded` in the coordinator. `locateButton` stays.
 
+### Associated Domains, and the strong-password flow it unlocks
+- The target has no entitlements file, so no `webcredentials:` association.
+- That is why `LoginView` uses `.textContentType(.password)` on sign-up rather
+  than `.newPassword`: without the association, Automatic Strong Passwords
+  half-runs and leaves the password field highlighted, locked and empty.
+- **Do when:** tropka.app is live and can host `/.well-known/apple-app-site-association`.
+  Then add the Associated Domains capability with `webcredentials:tropka.app`,
+  switch sign-up back to `.newPassword`, and test that focusing the password
+  field *first* still works.
+
 ## Ideas parked
 
 - Isochrones on the map ("what is within a 15-minute walk"), free with the

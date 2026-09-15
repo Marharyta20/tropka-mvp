@@ -48,6 +48,17 @@ struct TropkaButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Placeholder
+
+extension Text {
+    /// Placeholder text for a field: half weight, so a hint never looks like a
+    /// value somebody has already typed. Passed as `prompt:` rather than as the
+    /// field's title, which SwiftUI styles on its own terms.
+    static func hint(_ text: String) -> Text {
+        Text(text).foregroundColor(.secondary.opacity(0.5))
+    }
+}
+
 // MARK: - Field
 
 /// A text field that reads as one object with its label, rather than a bordered
@@ -75,8 +86,12 @@ struct TropkaField<Content: View>: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(
+            // Translucent rather than `.secondarySystemBackground`: both screens
+            // that use this field sit directly on the gradient now, and a flat
+            // grey over a coloured background reads as a patch. Letting the
+            // gradient through keeps the field attached to the screen it is on.
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+                .fill(Color(.systemBackground).opacity(0.7))
         )
     }
 }
