@@ -234,7 +234,24 @@ struct MapboxMapView: UIViewRepresentable {
                     pitch: 0
                 )
             )
-            mapView.viewport.transition(to: state)
+            // Place the camera, then let go of it.
+            //
+            // A follow-puck state does not move the map once — it keeps owning
+            // the camera and re-applies its own centre whenever anything
+            // disturbs the layout. Nothing here ever left that state, so the map
+            // stayed glued to the user for the whole session: opening the place
+            // sheet, changing its height, or tapping inside it was enough of a
+            // disturbance to snap the map back to where the user is standing.
+            // Mapbox drops the state on a map *gesture*, which is why panning
+            // hid the problem and why a tap inside the sheet never did.
+            //
+            // Going idle the moment the transition finishes keeps what this was
+            // for — the map opens on your own street, the locate button brings
+            // you back — and gives up only the following, which nothing in this
+            // screen asked for.
+            mapView.viewport.transition(to: state, completion: { [weak mapView] _ in
+                mapView?.viewport.idle()
+            })
         }
 
         // MARK: Camera commands

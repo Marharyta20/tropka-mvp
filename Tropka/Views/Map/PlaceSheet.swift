@@ -96,10 +96,7 @@ struct PlaceSheet: View {
             }
 
             if let address = details?.address, !address.isEmpty {
-                Text(address)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
+                CopyableAddress(address: address, lineLimit: 2)
             }
         }
         .padding(.horizontal, 20)

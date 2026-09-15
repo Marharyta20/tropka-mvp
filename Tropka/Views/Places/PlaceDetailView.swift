@@ -118,10 +118,7 @@ struct PlaceDetailView: View {
             }
 
             if let address = place.address, !address.isEmpty {
-                Label(address, systemImage: "mappin.and.ellipse")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                CopyableAddress(address: address, icon: "mappin.and.ellipse")
             }
         }
         .padding(.horizontal, 20)
