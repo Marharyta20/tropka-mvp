@@ -52,15 +52,6 @@ struct TipDetailView: View {
                     prefillDescription: "Built from the Tropka tip “\(tip.title)”."
                 )
             }
-            // The draft may already hold places collected on the map, and draining
-            // it would silently mix them into this route.
-            .confirmationDialog("You already have \(draftStore.count) place\(draftStore.count == 1 ? "" : "s") in a draft",
-                                isPresented: $askAboutDraft,
-                                titleVisibility: .visible) {
-                Button("Add these to my draft") { startRoute(keepingDraft: true) }
-                Button("Start fresh with this tip") { startRoute(keepingDraft: false) }
-                Button("Cancel", role: .cancel) { }
-            }
         }
         // Page views tell us where readers drop off inside a tip.
         .onChange(of: page) { _, newValue in
@@ -108,6 +99,25 @@ struct TipDetailView: View {
                 .foregroundColor(.white)
         }
         .buttonStyle(.plain)
+        // A real choice between three actions, so a confirmation dialog rather
+        // than an alert — and attached to the button that raises it, not to the
+        // screen. On iOS 26 the dialog anchors to the view carrying the
+        // modifier; hung on a container it comes out across the middle of the
+        // screen pointing at nothing.
+        //
+        // The draft may already hold places collected on the map, and draining
+        // it would silently mix them into this route.
+        .confirmationDialog("You already have \(draftStore.count) place\(draftStore.count == 1 ? "" : "s") in a draft",
+                            isPresented: $askAboutDraft,
+                            titleVisibility: .visible) {
+            Button("Add these to my draft") { startRoute(keepingDraft: true) }
+            Button("Start fresh with this tip", role: .destructive) {
+                startRoute(keepingDraft: false)
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Starting fresh throws those away.")
+        }
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .padding(.bottom, 12)

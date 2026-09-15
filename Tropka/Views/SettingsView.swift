@@ -11,8 +11,22 @@ struct SettingsView: View {
     @ObservedObject var profileVM: ProfileViewModel
     @StateObject private var vm: SettingsViewModel = .init()
 
-    @State private var showSaved = false
-    @State private var showDeleteConfirm = false
+    /// One piece of state for both messages this screen can show.
+    ///
+    /// There used to be two `.alert` modifiers on the same view, plus a
+    /// `.confirmationDialog` and a `.sheet`. SwiftUI resolves one presentation
+    /// per view, so a second alert attached to the same place is not a second
+    /// alert — the two fight, and what reaches the screen is a half-drawn box
+    /// with the dialog underneath still on top of the form.
+    ///
+    /// A single modifier driven by an enum cannot collide with itself.
+    private enum Notice: Equatable {
+        case saved
+        case failed(String)
+        case confirmDelete
+    }
+
+    @State private var notice: Notice?
     @State private var showPasswordSheet = false
     @ObservedObject private var push = PushService.shared
 
@@ -35,31 +49,49 @@ struct SettingsView: View {
         .sheet(isPresented: $showPasswordSheet) {
             ChangePasswordSheet(vm: vm)
         }
-        .confirmationDialog("Delete your account?",
-                            isPresented: $showDeleteConfirm,
-                            titleVisibility: .visible) {
-            Button("Delete account", role: .destructive) {
-                Task {
-                    guard await vm.deleteAccount() else { return }
-                    Analytics.track(.accountDeleted)
-                    Analytics.reset()
-                    dismiss()
+        .alert(noticeTitle, isPresented: Binding(
+            get: { notice != nil },
+            set: { if !$0 { notice = nil } })
+        ) {
+            if notice == .confirmDelete {
+                Button("Delete account", role: .destructive) {
+                    Task {
+                        guard await vm.deleteAccount() else { return }
+                        Analytics.track(.accountDeleted)
+                        Analytics.reset()
+                        dismiss()
+                    }
                 }
+                Button("Cancel", role: .cancel) { }
+            } else {
+                Button("OK", role: .cancel) { }
             }
-            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Your routes, reviews and saved routes are deleted with it. This cannot be undone.")
+            switch notice {
+            case let .failed(text):
+                Text(text)
+            case .confirmDelete:
+                Text("Your routes, reviews and saved routes are deleted with it. This cannot be undone.")
+            default:
+                EmptyView()
+            }
         }
-        .alert("Changes saved", isPresented: $showSaved) {
-            Button("OK", role: .cancel) { }
-        }
-        .alert("Error", isPresented: Binding(
-            get: { vm.error != nil },
-            set: { _ in vm.error = nil })
-        ) { Button("OK", role: .cancel) { } } message: {
-            Text(vm.error ?? "")
+        // The view model reports failures on its own; funnel them into the same
+        // one piece of state rather than giving them a second presentation.
+        .onChange(of: vm.error) { _, message in
+            guard let message else { return }
+            notice = .failed(message)
+            vm.error = nil
         }
         .task { await vm.load() }
+    }
+
+    private var noticeTitle: String {
+        switch notice {
+        case .failed:        return "Something went wrong"
+        case .confirmDelete: return "Delete your account?"
+        default:             return "Changes saved"
+        }
     }
 
     // MARK: - Sections
@@ -78,7 +110,7 @@ struct SettingsView: View {
                     guard await vm.save() else { return }
                     Analytics.track(.settingsSaved)
                     profileVM.displayName = vm.displayName
-                    showSaved = true
+                    notice = .saved
                 }
             }
             .disabled(!vm.isLoaded || vm.isBusy || !vm.hasChanges)
@@ -163,7 +195,7 @@ struct SettingsView: View {
     private var dangerSection: some View {
         Section {
             Button("Delete account", role: .destructive) {
-                showDeleteConfirm = true
+                notice = .confirmDelete
             }
         } footer: {
             Text("Deleting removes your profile, routes, reviews and saved routes permanently.")
@@ -180,10 +212,24 @@ private struct ChangePasswordSheet: View {
     @State private var current = ""
     @State private var new = ""
     @State private var confirm = ""
-    @State private var done = false
+
+    /// One alert, two outcomes — same reason as on the screen behind this one.
+    /// A failure also has nowhere else to go: the view model is shared, and the
+    /// alert on `SettingsView` cannot appear over a sheet that is covering it.
+    private enum Outcome: Equatable {
+        case changed
+        case failed(String)
+    }
+
+    @State private var outcome: Outcome?
 
     private var canSubmit: Bool {
         !current.isEmpty && new.count >= 6 && new == confirm
+    }
+
+    private var outcomeTitle: String {
+        if case .failed = outcome { return "Couldn't change it" }
+        return "Password changed"
     }
 
     var body: some View {
@@ -221,20 +267,40 @@ private struct ChangePasswordSheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
+                    // `.bold()` marks this as the screen's primary action, which
+                    // is what the toolbar renders as a filled capsule rather than
+                    // a plain one. Every other Save in the app has it; this was
+                    // the only one that did not, so it alone came out white.
                     Button("Save") {
                         Task {
                             guard await vm.changePassword(current: current, new: new) else { return }
-                            done = true
+                            outcome = .changed
                         }
                     }
+                    .bold()
                     .disabled(!canSubmit || vm.isBusy)
                 }
             }
             .overlay {
                 if vm.isBusy { ProgressView().controlSize(.large) }
             }
-            .alert("Password changed", isPresented: $done) {
-                Button("OK") { dismiss() }
+            .alert(outcomeTitle,
+                   isPresented: Binding(get: { outcome != nil },
+                                        set: { if !$0 { outcome = nil } })) {
+                // Read before clearing: the sheet closes only on success, and a
+                // failure has to leave the form standing with what was typed.
+                Button("OK") {
+                    let succeeded = outcome == .changed
+                    outcome = nil
+                    if succeeded { dismiss() }
+                }
+            } message: {
+                if case let .failed(text) = outcome { Text(text) }
+            }
+            .onChange(of: vm.error) { _, message in
+                guard let message else { return }
+                outcome = .failed(message)
+                vm.error = nil
             }
         }
     }

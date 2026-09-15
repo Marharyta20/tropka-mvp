@@ -273,18 +273,25 @@ struct ProfileView: View {
                                        description: Text("Routes you save from Explore or the map show up here."))
             }
         }
-        .confirmationDialog("Remove this route?", isPresented: $showDeleteConfirm) {
+        // An alert, not a confirmation dialog. Apple reserves the dialog for a
+        // choice between several actions and the alert for a destructive yes/no
+        // — and the alert has the practical advantage of drawing the same on
+        // every iOS, because it is centred rather than anchored to whatever was
+        // tapped. That anchoring is what put the delete dialog across the middle
+        // of Settings on iOS 26 with no Cancel in sight.
+        .alert("Remove this route?", isPresented: $showDeleteConfirm) {
             Button("Remove", role: .destructive) {
-                if let item = pendingDelete {
-                    Analytics.track(.routeUnsaved, [
-                        "route_id": item.route.id,
-                        "route_title": item.route.title,
-                        "source": Analytics.Source.profile.rawValue
-                    ])
-                    Task { await vm.unsave(routeID: item.route.id) }
-                }
+                guard let item = pendingDelete else { return }
+                Analytics.track(.routeUnsaved, [
+                    "route_id": item.route.id,
+                    "route_title": item.route.title,
+                    "source": Analytics.Source.profile.rawValue
+                ])
+                Task { await vm.unsave(routeID: item.route.id) }
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text("It stays on Explore — this only takes it out of your saved list.")
         }
     }
 
@@ -375,14 +382,14 @@ struct ProfileView: View {
                 }
             }
         }
-        .confirmationDialog("Delete this route? This cannot be undone.",
-                            isPresented: $showCreatedDeleteConfirm) {
+        .alert("Delete this route?", isPresented: $showCreatedDeleteConfirm) {
             Button("Delete", role: .destructive) {
-                if let route = pendingCreatedDelete {
-                    Task { await vm.deleteCreated(routeID: route.id) }
-                }
+                guard let route = pendingCreatedDelete else { return }
+                Task { await vm.deleteCreated(routeID: route.id) }
             }
             Button("Cancel", role: .cancel) { pendingCreatedDelete = nil }
+        } message: {
+            Text("It disappears for everybody who saved it. This cannot be undone.")
         }
         .task { await vm.fetchCreatedRoutes() }
         .refreshable { await vm.fetchCreatedRoutes() }
