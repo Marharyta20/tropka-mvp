@@ -27,6 +27,10 @@ struct MapboxMapView: UIViewRepresentable {
     /// Remove before release; see PRE-RELEASE.md.
     var zoomInTrigger: Int = 0
     var zoomOutTrigger: Int = 0
+    /// Which way the basemap is lit. Passed in from the environment rather than
+    /// read from the trait collection, so SwiftUI re-runs `updateUIView` by
+    /// itself when the phone changes appearance.
+    var colorScheme: ColorScheme
 
     /// The app is about Warsaw, so Warsaw is where the map opens.
     private static let fallbackCenter = CLLocationCoordinate2D(latitude: 52.2319, longitude: 21.0067)
@@ -65,6 +69,7 @@ struct MapboxMapView: UIViewRepresentable {
         context.coordinator.recenterIfNeeded(trigger: recenterTrigger)
         context.coordinator.focusIfNeeded(trigger: focusTrigger, on: places)
         context.coordinator.zoomIfNeeded(inTrigger: zoomInTrigger, outTrigger: zoomOutTrigger)
+        context.coordinator.setColorScheme(colorScheme)
     }
 
     // MARK: - Coordinator
@@ -93,6 +98,9 @@ struct MapboxMapView: UIViewRepresentable {
         private static let warsaw = CLLocation(latitude: 52.2319, longitude: 21.0067)
         private static let cityRadius: CLLocationDistance = 60_000
         private var hasDecidedOpeningCamera = false
+
+        private var colorScheme: ColorScheme = .light
+        fileprivate let lighting = BasemapLighting()
 
         // MARK: Layout state
 
@@ -150,7 +158,10 @@ struct MapboxMapView: UIViewRepresentable {
 
             mapView.mapboxMap.onStyleLoaded.observeNext { [weak self, weak mapView] _ in
                 guard let mapView else { return }
-                self?.applyLightPreset(to: mapView)
+                // A style reload throws the import config away, so the
+                // preset has to be re-applied rather than assumed to be there.
+                self?.lighting.invalidate()
+                self?.applyLightPreset()
                 self?.render()
             }.store(in: &cancelables)
 
@@ -316,18 +327,14 @@ struct MapboxMapView: UIViewRepresentable {
         // MARK: Style
 
         /// Warsaw at 22:00 should not look like Warsaw at noon.
-        private func applyLightPreset(to mapView: MapboxMaps.MapView) {
-            let hour = Calendar.current.component(.hour, from: Date())
-            let preset: String
-            switch hour {
-            case 5..<8:   preset = "dawn"
-            case 8..<17:  preset = "day"
-            case 17..<21: preset = "dusk"
-            default:      preset = "night"
-            }
-            try? mapView.mapboxMap.setStyleImportConfigProperty(
-                for: "basemap", config: "lightPreset", value: preset
-            )
+        func setColorScheme(_ scheme: ColorScheme) {
+            colorScheme = scheme
+            applyLightPreset()
+        }
+
+        private func applyLightPreset() {
+            guard let mapView else { return }
+            lighting.apply(colorScheme, to: mapView)
         }
 
         // MARK: Model

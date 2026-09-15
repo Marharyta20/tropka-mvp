@@ -13,13 +13,15 @@ struct RouteMapView: View {
     @State private var selectedStopIndex = 0
     @State private var recenterTrigger = 0
     @State private var showList = false
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         MapRepresentable(
             stops: vm.stops,
             routeCoords: vm.routeCoords,
             selectedStopIndex: selectedStopIndex,
-            recenterTrigger: recenterTrigger
+            recenterTrigger: recenterTrigger,
+            colorScheme: colorScheme
         )
         .ignoresSafeArea()
         .overlay(alignment: .topTrailing) { mapControls }

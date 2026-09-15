@@ -23,6 +23,7 @@ struct MapScreenView: View {
     @State private var zoomInTrigger = 0
     @State private var zoomOutTrigger = 0
     @State private var searchDebounce: Task<Void, Never>?
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -40,7 +41,8 @@ struct MapScreenView: View {
                 recenterTrigger: recenterTrigger,
                 focusTrigger: focusTrigger,
                 zoomInTrigger: zoomInTrigger,
-                zoomOutTrigger: zoomOutTrigger
+                zoomOutTrigger: zoomOutTrigger,
+                colorScheme: colorScheme
             )
             .ignoresSafeArea()
 

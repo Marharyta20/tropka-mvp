@@ -11,6 +11,8 @@ struct MapRepresentable: UIViewRepresentable {
     var selectedStopIndex: Int = 0
     /// Bumped by the recenter button to fit the whole route back on screen.
     var recenterTrigger: Int = 0
+    /// Which way the basemap is lit — see `BasemapLighting`.
+    var colorScheme: ColorScheme
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -43,7 +45,8 @@ struct MapRepresentable: UIViewRepresentable {
 
         mapView.mapboxMap.onStyleLoaded.observeNext { [weak mapView, weak coordinator = context.coordinator] _ in
             guard let mapView, let coordinator else { return }
-            coordinator.applyLightPreset(to: mapView)
+            coordinator.lighting.invalidate()
+            coordinator.lighting.apply(coordinator.parent.colorScheme, to: mapView)
             coordinator.draw(on: mapView)
             coordinator.fitRoute(on: mapView, animated: false)
         }.store(in: &context.coordinator.cancelables)
@@ -56,6 +59,7 @@ struct MapRepresentable: UIViewRepresentable {
     func updateUIView(_ mapView: MapboxMaps.MapView, context: Context) {
         let coordinator = context.coordinator
         coordinator.parent = self
+        coordinator.lighting.apply(colorScheme, to: mapView)
         coordinator.draw(on: mapView)
 
         // Refit only when asked. The old version refitted on every state change, so
@@ -88,22 +92,10 @@ struct MapRepresentable: UIViewRepresentable {
         /// yank the camera back mid-gesture.
         private var lastFittedSignature = ""
 
+        let lighting = BasemapLighting()
+
         init(_ parent: MapRepresentable) {
             self.parent = parent
-        }
-
-        func applyLightPreset(to mapView: MapboxMaps.MapView) {
-            let hour = Calendar.current.component(.hour, from: Date())
-            let preset: String
-            switch hour {
-            case 5..<8:   preset = "dawn"
-            case 8..<17:  preset = "day"
-            case 17..<21: preset = "dusk"
-            default:      preset = "night"
-            }
-            try? mapView.mapboxMap.setStyleImportConfigProperty(
-                for: "basemap", config: "lightPreset", value: preset
-            )
         }
 
         // MARK: Drawing
