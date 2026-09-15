@@ -46,6 +46,8 @@ struct RouteEditorView: View {
     @State private var thumbnailImage: UIImage?
     @State private var thumbnailURL: URL?
     @State private var photoItem: PhotosPickerItem?
+    @State private var showCamera = false
+    @State private var showLibrary = false
 
     @State private var showPicker = false
     @State private var editingStop: DraftStop?
@@ -200,15 +202,41 @@ struct RouteEditorView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    PhotosPicker(selection: $photoItem, matching: .images) {
-                        Text(thumbnailURL == nil ? "Choose image" : "Replace image")
+                    // A menu rather than two buttons: on the Simulator, and on the
+                    // odd device without a camera, the capture option is simply
+                    // absent instead of opening a black screen.
+                    if Camera.isAvailable {
+                        Menu(thumbnailURL == nil ? "Choose image" : "Replace image") {
+                            Button {
+                                showCamera = true
+                            } label: {
+                                Label("Take a photo", systemImage: "camera")
+                            }
+                            Button {
+                                showLibrary = true
+                            } label: {
+                                Label("Choose from library", systemImage: "photo.on.rectangle")
+                            }
+                        }
+                    } else {
+                        Button(thumbnailURL == nil ? "Choose image" : "Replace image") {
+                            showLibrary = true
+                        }
                     }
+
                     if isUploading {
                         ProgressView("Uploading…").font(.caption)
                     }
                 }
                 Spacer()
             }
+        }
+        .photosPicker(isPresented: $showLibrary, selection: $photoItem, matching: .images)
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker { data in
+                Task { await upload(data) }
+            }
+            .ignoresSafeArea()
         }
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
@@ -309,10 +337,17 @@ struct RouteEditorView: View {
     }
 
     private func upload(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+        // Library images arrive at full resolution too, so they go through the
+        // same downscale as a capture — a 12-megapixel cover helps nobody and
+        // costs the author their data allowance.
+        await upload(UIImage(data: data)?.jpegForUpload() ?? data)
+    }
+
+    private func upload(_ data: Data) async {
         isUploading = true
         defer { isUploading = false }
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else { return }
             thumbnailImage = UIImage(data: data)
             thumbnailURL = try await StorageService.shared.uploadRouteThumbnail(data)
         } catch {
@@ -350,6 +385,14 @@ struct RouteEditorView: View {
                 Analytics.track(.routeCreated, properties)
                 // The collected places are now stops on a real route.
                 draftStore.clear()
+                // Asked here and nowhere else. The author has just published
+                // something other people can review, so "tell me when they do"
+                // is an offer rather than an interruption — and iOS shows this
+                // sheet exactly once in the app's lifetime, so it is worth
+                // spending on the one moment it lands.
+                if case .create = mode, PushService.shared.systemStatus == .notDetermined {
+                    await PushService.shared.requestPermission()
+                }
 
             case let .edit(routeID):
                 try await service.updateRoute(routeID: routeID,

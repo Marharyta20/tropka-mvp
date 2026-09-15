@@ -14,11 +14,13 @@ struct SettingsView: View {
     @State private var showSaved = false
     @State private var showDeleteConfirm = false
     @State private var showPasswordSheet = false
+    @ObservedObject private var push = PushService.shared
 
     var body: some View {
         Form {
             profileSection
             accountSection
+            notificationsSection
             aboutSection
             dangerSection
         }
@@ -115,6 +117,36 @@ struct SettingsView: View {
                 dismiss()
             }
         }
+    }
+
+    private var notificationsSection: some View {
+        Section {
+            switch push.systemStatus {
+            case .denied:
+                // Prompting again does nothing: iOS shows the sheet once. The
+                // only honest move is to say where the switch actually lives.
+                LabeledContent("Notifications") {
+                    Text("Off in iOS Settings").foregroundColor(.secondary)
+                }
+                Link("Open Settings", destination: URL(string: UIApplication.openSettingsURLString)!)
+
+            case .notDetermined:
+                Button("Turn on notifications") {
+                    Task { await push.requestPermission() }
+                }
+
+            default:
+                Toggle("Notifications", isOn: Binding(
+                    get: { push.isEnabled },
+                    set: { value in Task { await push.setEnabled(value) } }
+                ))
+            }
+        } header: {
+            Text("Notifications")
+        } footer: {
+            Text("When someone reviews a route you published.")
+        }
+        .task { await push.loadEnabled(); await push.refreshStatus() }
     }
 
     private var aboutSection: some View {

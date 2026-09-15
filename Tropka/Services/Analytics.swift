@@ -41,14 +41,26 @@ enum Analytics {
         config.captureElementInteractions = false        // named events read far better than autocapture
 
         // Session replay — watch how people actually move through the app.
+        //
+        // Off in debug builds. Screenshot mode reaches into the view hierarchy to
+        // capture each frame, and every capture makes SwiftUI log
+        //
+        //   Adding '_UIReparentingView' as a subview of UIHostingController.view
+        //   is not supported and may result in a broken view hierarchy
+        //
+        // which is how it looked like a bug in our own presentation code. It is
+        // PostHog's warning, it is harmless, and replay keeps working — but it
+        // repeats on every snapshot and buries anything else in the console.
+        // Nobody watches replays of a simulator anyway.
+        #if DEBUG
+        config.sessionReplay = false
+        config.debug = true
+        config.flushAt = 1  // see events in PostHog immediately while developing
+        #else
         config.sessionReplay = true
         config.sessionReplayConfig.screenshotMode = true      // required for SwiftUI to render correctly
         config.sessionReplayConfig.maskAllTextInputs = true   // never record typing (passwords, emails)
         config.sessionReplayConfig.maskAllImages = false      // route/place photos are public content
-
-        #if DEBUG
-        config.debug = true
-        config.flushAt = 1  // see events in PostHog immediately while developing
         #endif
 
         PostHogSDK.shared.setup(config)
@@ -117,6 +129,8 @@ extension Analytics {
         case routeWalked        = "route_walked"
         case routeUnwalked      = "route_unwalked"
         case onboardingFinished = "onboarding_finished"
+        case pushPermissionAnswered = "push_permission_answered"
+        case pushOpened         = "push_opened"
         case routeMapOpened     = "route_map_opened"
         case routeStopStepped   = "route_stop_stepped"
         case routeStopOpened    = "route_stop_opened"

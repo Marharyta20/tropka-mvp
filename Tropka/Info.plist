@@ -10,10 +10,24 @@
         <string>$(POSTHOG_API_KEY)</string>
         <key>POSTHOG_HOST</key>
         <string>$(POSTHOG_HOST)</string>
+        <!-- The only authorisation the app ever asks for. During turn-by-turn
+             guidance iOS keeps delivering updates in the background on the
+             strength of the location background mode below, with the blue bar
+             showing — "Always" is neither needed nor requested. Declaring the
+             Always string anyway invited a reviewer to ask why. -->
+        <!-- Taking a cover photo for a route. The photo library needs no
+             description of its own: PhotosPicker runs out of process and hands
+             back only the chosen file. -->
+        <key>NSCameraUsageDescription</key>
+        <string>Take a photo to use as the cover of a route you are building.</string>
+
         <key>NSLocationWhenInUseUsageDescription</key>
-        <string>This app needs your location to show where you are on the map.</string>
-        <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-        <string>This app uses your location for navigation guidance.</string>
+        <string>Tropka shows where you are on the map and guides you between the stops of a walking route.</string>
+
+        <!-- Both are earned by turn-by-turn navigation, which keeps running with
+             the screen off and speaks directions aloud through Mapbox's voice
+             controller. Remove them the day navigation goes: an unused
+             background mode is one of the easiest rejections to collect. -->
         <key>UIBackgroundModes</key>
         <array>
             <string>audio</string>

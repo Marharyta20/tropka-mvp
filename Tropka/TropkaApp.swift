@@ -3,8 +3,15 @@ import SwiftUI
 @main
 struct TropkaApp: App {
 
+    /// SwiftUI exposes no hook for the two APNs callbacks, so an adaptor carries
+    /// the smallest delegate that can receive a device token.
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     init() {
         Analytics.start()
+        // Registers for a token if permission already exists. Never prompts —
+        // the prompt is shown where it means something, not at launch.
+        PushService.shared.start()
     }
 
     var body: some Scene {
