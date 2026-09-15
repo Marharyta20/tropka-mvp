@@ -158,6 +158,35 @@ struct MapboxMapView: UIViewRepresentable {
                 self?.render()
             }.store(in: &cancelables)
 
+            // Camera movement, not only the end of it.
+            //
+            // `onMapIdle` was the only thing the camera used to trigger a
+            // relayout, and it does not reliably arrive: tiles keep loading, a
+            // gesture rolls on into inertia, and the map never settles. What is
+            // on screen is then the layout built for the zoom the user has
+            // already left — which is why zooming out left the whole city drawn
+            // as hundreds of single pins, and why a stray tap fixed it: tapping
+            // calls `render()` directly.
+            //
+            // Deliberately narrow, and the narrowness is the point:
+            //
+            // - It returns unless the half-step the layout is built for has
+            //   actually changed, so panning at one zoom costs a comparison.
+            // - It does nothing at all while a group is spread open. The ring is
+            //   positioned in screen space, so rendering it on every frame of a
+            //   camera animation would reassign `annotations` dozens of times —
+            //   that is the blinking we already fixed once. An open ring still
+            //   follows the camera from `onMapIdle`, exactly as before.
+            //
+            // Both guards exist to keep this away from the spreading path. Test
+            // it there: tap a group at z17 and check the members still fly out.
+            mapView.mapboxMap.onCameraChanged.observe { [weak self] _ in
+                guard let self, let mapView = self.mapView, self.openGroup == nil else { return }
+                let step = Int((mapView.mapboxMap.cameraState.zoom * 2).rounded())
+                guard step != self.cachedZoomStep else { return }
+                self.render()
+            }.store(in: &cancelables)
+
             // Runs after the annotations have had their say, because an interaction
             // added earlier is invoked later.
             mapView.mapboxMap.addInteraction(TapInteraction { [weak self] context in

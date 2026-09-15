@@ -2,9 +2,8 @@ import SwiftUI
 
 /// Two screens between signing up and the app.
 ///
-/// It exists because a fresh profile used to be a blank avatar and a username
-/// the system invented — `user6246`, shown publicly under the person's name. Both
-/// steps can be skipped; nothing here is worth blocking somebody over.
+/// It exists because a fresh profile used to be a blank avatar and nothing else.
+/// Both steps can be skipped; nothing here is worth blocking somebody over.
 struct OnboardingView: View {
     @StateObject private var vm = OnboardingViewModel()
     @State private var step = 0
@@ -54,9 +53,15 @@ struct OnboardingView: View {
 
             Spacer()
 
-            Button("Skip") { onFinish() }
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            Button("Skip") {
+                Task {
+                    guard await vm.skip() else { return }
+                    onFinish()
+                }
+            }
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+            .disabled(vm.isSaving)
         }
         .padding(.horizontal, 24)
         .padding(.top, 16)
@@ -125,10 +130,9 @@ struct OnboardingView: View {
                     }
                 }
 
-                TropkaField(title: "USERNAME", icon: "at") {
-                    TextField("username", text: $vm.username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                TropkaField(title: "NAME", icon: "person") {
+                    TextField("", text: $vm.displayName, prompt: .hint("Anna"))
+                        .textInputAutocapitalization(.words)
                 }
             }
             .padding(.horizontal, 24)
@@ -143,20 +147,6 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 24) {
                 title("What are you into?",
                       subtitle: "We'll put these first on Explore and on the map. Nothing gets hidden.")
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("WHERE ARE YOU BASED?")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-
-                    FlowLayout(spacing: 8) {
-                        ForEach(vm.cities) { city in
-                            chip(city.name, selected: vm.cityID == city.id) {
-                                vm.cityID = city.id
-                            }
-                        }
-                    }
-                }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("PICK AS MANY AS YOU LIKE")

@@ -19,7 +19,6 @@ class ProfileViewModel: ObservableObject {
     /// True until the profile row has been read once — lets the UI show a
     /// placeholder instead of a fake name.
     @Published var isLoadingProfile = true
-    @Published var handle      = ""
     @Published var city        = ""
     @Published var registrationDate: Date?
     /// Raw contents of users.photo_url — see Avatar for how it is interpreted.
@@ -76,7 +75,6 @@ class ProfileViewModel: ObservableObject {
 
         struct UserRow: Decodable {
             let fullName: String?
-            let username: String?
             let photoUrl: String?
             let registrationDate: Date?
             let cities: CityRow?
@@ -85,7 +83,6 @@ class ProfileViewModel: ObservableObject {
 
             enum CodingKeys: String, CodingKey {
                 case fullName = "full_name"
-                case username
                 case photoUrl = "photo_url"
                 case registrationDate = "registration_date"
                 case cities
@@ -95,13 +92,12 @@ class ProfileViewModel: ObservableObject {
         do {
             let row: UserRow = try await supabase
                 .from("users")
-                .select("full_name, username, photo_url, registration_date, cities(name)")
+                .select("full_name, photo_url, registration_date, cities(name)")
                 .eq("id", value: uid)
                 .single()
                 .execute()
                 .value
             displayName      = row.fullName ?? "Unknown User"
-            handle           = row.username ?? "user"
             avatarValue      = row.photoUrl
             UserPreferences.shared.setAvatar(row.photoUrl)
             city             = row.cities?.name ?? ""

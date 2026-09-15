@@ -4,8 +4,17 @@ import SwiftUI
 @MainActor
 class SettingsViewModel: ObservableObject {
     @Published var displayName = ""
-    @Published var username = ""
     @Published var error: String?
+
+    /// What the database held when the screen opened. Kept so the Save button
+    /// can tell an edit from a glance: it used to be enabled the moment the
+    /// screen loaded, and saving an unchanged profile reported "Changes saved"
+    /// for a write that changed nothing.
+    private var loadedName = ""
+
+    var hasChanges: Bool {
+        displayName.trimmingCharacters(in: .whitespacesAndNewlines) != loadedName
+    }
     @Published var isBusy = false
     /// Nothing may be saved before the current values have been read: saving a
     /// field the user never saw would overwrite their profile with a blank.
@@ -34,23 +43,21 @@ class SettingsViewModel: ObservableObject {
 
         struct UserRow: Decodable {
             let fullName: String?
-            let username: String?
             enum CodingKeys: String, CodingKey {
                 case fullName = "full_name"
-                case username
             }
         }
 
         do {
             let row: UserRow = try await supabase
                 .from("users")
-                .select("full_name, username")
+                .select("full_name")
                 .eq("id", value: uid)
                 .single()
                 .execute()
                 .value
             displayName = row.fullName ?? ""
-            username    = row.username ?? ""
+            loadedName = displayName
             isLoaded = true
         } catch {
             self.error = error.localizedDescription
@@ -67,9 +74,8 @@ class SettingsViewModel: ObservableObject {
     func save() async -> Bool {
         guard let uid = supabase.auth.currentUser?.id.uuidString else { return false }
         let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let handle = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard isLoaded, !name.isEmpty, !handle.isEmpty else {
-            error = "Name and username can't be empty."
+        guard isLoaded, !name.isEmpty else {
+            error = "Your name can't be empty."
             return false
         }
         isBusy = true
@@ -77,22 +83,21 @@ class SettingsViewModel: ObservableObject {
 
         struct UserUpdate: Encodable {
             let fullName: String
-            let username: String
             enum CodingKeys: String, CodingKey {
                 case fullName = "full_name"
-                case username
             }
         }
 
         do {
             try await supabase
                 .from("users")
-                .update(UserUpdate(fullName: name, username: handle))
+                .update(UserUpdate(fullName: name))
                 .eq("id", value: uid)
                 .execute()
-            // Write back the trimmed values, so the fields show what was stored.
+            // Write back the trimmed value, so the field shows what was stored
+            // and the button goes quiet again.
             displayName = name
-            username = handle
+            loadedName = name
             return true
         } catch {
             self.error = error.localizedDescription

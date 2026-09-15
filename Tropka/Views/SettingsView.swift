@@ -71,33 +71,21 @@ struct SettingsView: View {
                     .multilineTextAlignment(.trailing)
                     .textInputAutocapitalization(.words)
             }
-            LabeledContent("Username") {
-                TextField("username", text: $vm.username)
-                    .multilineTextAlignment(.trailing)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
             Button("Save changes") {
                 Task {
-                    let changedName = vm.displayName != profileVM.displayName
-                    let changedUsername = vm.username != profileVM.handle
                     // Nothing is reported, and nothing is copied into the profile
                     // header, until the database has taken it.
                     guard await vm.save() else { return }
-                    Analytics.track(.settingsSaved, [
-                        "changed_name": changedName,
-                        "changed_username": changedUsername
-                    ])
+                    Analytics.track(.settingsSaved)
                     profileVM.displayName = vm.displayName
-                    profileVM.handle      = vm.username
                     showSaved = true
                 }
             }
-            .disabled(!vm.isLoaded || vm.isBusy)
+            .disabled(!vm.isLoaded || vm.isBusy || !vm.hasChanges)
         } header: {
             Text("Profile")
         } footer: {
-            Text("Your name and username are shown on routes and reviews you publish.")
+            Text("Your name is shown on routes and reviews you publish.")
         }
     }
 

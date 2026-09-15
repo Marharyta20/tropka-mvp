@@ -32,10 +32,21 @@ final class AuthService {
             }
         }
 
+        // The generated handle is never shown and never asked for: `username`
+        // is `UNIQUE` in `public.users` and route cards fall back to it when a
+        // name is blank. It stays as plumbing until profiles become public and
+        // a handle is something the user chooses on purpose.
+        //
+        // Derived from the account id rather than random. The old
+        // `user<1000...9999>` drew from 9000 values against a UNIQUE column,
+        // which by the birthday bound starts colliding around the hundredth
+        // account — and sign-up would have failed with a constraint violation
+        // for a field the user never filled in and, since the handle left
+        // Settings, can no longer change.
         let profile = UserInsert(
             id: user.id.uuidString,
             fullName: fullName,
-            username: "user\(Int.random(in: 1000...9999))"
+            username: "user_" + user.id.uuidString.prefix(8).lowercased()
         )
         try await supabase.from("users").upsert(profile).execute()
     }

@@ -133,10 +133,7 @@ struct ProfileView: View {
         }
     }
 
-    private var subtitle: String {
-        let handle = vm.handle.isEmpty ? "" : "@\(vm.handle)"
-        return [handle, vm.city].filter { !$0.isEmpty }.joined(separator: " · ")
-    }
+    private var subtitle: String { vm.city }
 
     private var actionRow: some View {
         HStack(spacing: 12) {
@@ -167,7 +164,9 @@ struct ProfileView: View {
 
     /// Plain-text invite for now — swap in a real App Store / profile URL once one exists.
     private var shareProfileText: String {
-        "Check out my profile on Tropka! I'm @\(vm.handle) 🗺️"
+        vm.displayName.isEmpty
+            ? "Check out Tropka — walking routes worth the detour 🗺️"
+            : "Check out my profile on Tropka! I'm \(vm.displayName) 🗺️"
     }
 
     // MARK: - Tabs
@@ -415,7 +414,7 @@ struct ProfileView: View {
         .contentShape(Rectangle())
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color(.systemGray4), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                .fill(Color(.secondarySystemBackground))
         )
     }
 

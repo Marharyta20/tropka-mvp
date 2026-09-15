@@ -48,6 +48,21 @@ final class AuthViewModel: ObservableObject {
                     switch event {
                     case .signedOut, .userDeleted:
                         self.state = .signedOut
+                        // Cleared here rather than in `signOut()` because
+                        // `signOut()` is not the only way a session ends:
+                        // Settings calls `supabase.auth.signOut()` straight,
+                        // Delete Account goes through the Edge Function, and a
+                        // refresh can fail on its own. This view model outlives
+                        // all three — it is a `@StateObject` on `ContentView`,
+                        // which is why the fields survived a sign-out but not a
+                        // relaunch — so anything it holds has to be dropped
+                        // where the session actually ends.
+                        //
+                        // What was on screen: sign out, and the login form came
+                        // back with the address and the password of the account
+                        // that just left. After Delete Account, of an account
+                        // that no longer existed.
+                        self.clearCredentials()
                     case .tokenRefreshed, .signedIn, .initialSession, .userUpdated, .passwordRecovery:
                         self.state = session != nil ? .signedIn : self.state
                     default:
@@ -120,9 +135,15 @@ final class AuthViewModel: ObservableObject {
             Analytics.track(.signedOut)
             Analytics.reset()   // next person on this device is a separate user
             state = .signedOut
-            email = ""
-            password = ""
-            fullName = ""
+            clearCredentials()
         }
+    }
+
+    /// Everything typed into the login form. Both screens read from here, so
+    /// this empties the sign-up fields as well as the log-in ones.
+    private func clearCredentials() {
+        email = ""
+        password = ""
+        fullName = ""
     }
 }

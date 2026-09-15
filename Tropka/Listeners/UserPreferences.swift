@@ -117,9 +117,8 @@ final class UserPreferences: ObservableObject {
         needsOnboarding = true
     }
 
-    func markOnboarded(interests: [PlaceCategory], cityID: Int) {
+    func markOnboarded(interests: [PlaceCategory]) {
         self.interests = interests
-        self.cityID = cityID
         needsOnboarding = false
     }
 }

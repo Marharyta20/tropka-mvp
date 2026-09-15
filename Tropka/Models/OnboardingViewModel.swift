@@ -1,78 +1,65 @@
 import Foundation
 
-// MARK: - City
-
-struct City: Identifiable, Equatable, Decodable {
-    let id: Int
-    let name: String
-    let country: String
-}
-
 // MARK: - OnboardingViewModel
 
 /// Backs the short setup step a new account goes through.
 ///
-/// Scope was chosen by one rule: ask nothing whose answer changes nothing. An
-/// avatar and a username are what the profile shows, and both were being filled
-/// in by the system with a blank and `user6246`. A city feeds the map's
-/// "open on Warsaw unless you are in Warsaw" logic and matters the moment there
-/// is a second city. Interests order Explore and the map chips.
+/// Scope was chosen by one rule: ask nothing whose answer changes nothing.
+/// An avatar and a name are what the profile shows, and the avatar was being
+/// left blank. Interests order Explore and the map chips.
 ///
-/// What is deliberately absent: travel style, pace, budget. Nothing in the app
-/// consumes them, and a question that only costs the user time is worse than no
-/// question at all.
+/// What is deliberately absent:
+///
+/// - **A username.** It appeared in three places — the profile subtitle, the
+///   share text, and as a stand-in for an empty name on a route card — and
+///   nothing in the app looked anybody up by one. A second identity to invent,
+///   keep unique and explain, in exchange for decoration. The column is still
+///   there for the day profiles become public and `tropka.app/@rita` means
+///   something.
+/// - **A city.** `city_id` is read and stored and then read by nobody. It will
+///   matter with a second city; asking now only spends the user's time.
+/// - **Travel style, pace, budget.** Same rule, never added.
 @MainActor
 final class OnboardingViewModel: ObservableObject {
-    @Published var username = ""
+    @Published var displayName = ""
     @Published var avatar: Avatar?
-    @Published var cityID = 1
     @Published var interests: Set<PlaceCategory> = []
 
-    @Published private(set) var cities: [City] = []
     @Published private(set) var categories: [CategoryCount] = []
     @Published var isSaving = false
     @Published var errorMessage: String?
 
     var canFinish: Bool {
-        !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     // MARK: - Load
 
     func load() async {
-        async let citiesTask = try? fetchCities()
         async let countsTask = try? PlacesService.shared.categoryCounts()
-        async let profileTask = try? fetchCurrentUsername()
+        async let profileTask = try? fetchCurrentName()
 
-        let (cities, counts, existing) = await (citiesTask, countsTask, profileTask)
-        self.cities = cities ?? [City(id: 1, name: "Warsaw", country: "Poland")]
+        let (counts, existing) = await (countsTask, profileTask)
         self.categories = counts ?? []
-        // Prefilled rather than blank: the generated handle is a starting point,
-        // and somebody who does not care can move on without typing.
-        if username.isEmpty, let existing { username = existing }
+        // Prefilled from what they typed at sign-up rather than blank: somebody
+        // who is happy with it can move on without typing it twice.
+        if displayName.isEmpty, let existing { displayName = existing }
     }
 
-    private func fetchCities() async throws -> [City] {
-        try await supabase
-            .from("cities")
-            .select("id, name, country")
-            .eq("is_active", value: true)
-            .order("name")
-            .execute()
-            .value
-    }
-
-    private func fetchCurrentUsername() async throws -> String? {
+    private func fetchCurrentName() async throws -> String? {
         guard let uid = supabase.auth.currentUser?.id.uuidString else { return nil }
-        struct Row: Decodable { let username: String? }
+        struct Row: Decodable {
+            let fullName: String?
+            enum CodingKeys: String, CodingKey { case fullName = "full_name" }
+        }
         let row: Row = try await supabase
             .from("users")
-            .select("username")
+            .select("full_name")
             .eq("id", value: uid)
             .single()
             .execute()
             .value
-        return row.username
+        return row.fullName
     }
 
     // MARK: - Save
@@ -80,9 +67,9 @@ final class OnboardingViewModel: ObservableObject {
     @discardableResult
     func finish() async -> Bool {
         guard let uid = supabase.auth.currentUser?.id.uuidString else { return false }
-        let handle = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !handle.isEmpty else {
-            errorMessage = "Pick a username."
+        let name = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            errorMessage = "Tell us what to call you."
             return false
         }
 
@@ -90,15 +77,13 @@ final class OnboardingViewModel: ObservableObject {
         defer { isSaving = false }
 
         struct Update: Encodable {
-            let username: String
+            let fullName: String
             let photoUrl: String?
-            let cityId: Int
             let interests: [Int]
             let onboardedAt: String
             enum CodingKeys: String, CodingKey {
-                case username
+                case fullName = "full_name"
                 case photoUrl = "photo_url"
-                case cityId = "city_id"
                 case interests
                 case onboardedAt = "onboarded_at"
             }
@@ -109,24 +94,65 @@ final class OnboardingViewModel: ObservableObject {
         do {
             try await supabase
                 .from("users")
-                .update(Update(username: handle,
+                .update(Update(fullName: name,
                                photoUrl: avatar?.storedValue,
-                               cityId: cityID,
                                interests: picked.map(\.rawValue),
-                               onboardedAt: ISO8601DateFormatter().string(from: Date())))
+                               onboardedAt: Self.now))
                 .eq("id", value: uid)
                 .execute()
 
-            UserPreferences.shared.markOnboarded(interests: picked, cityID: cityID)
+            UserPreferences.shared.markOnboarded(interests: picked)
             Analytics.track(.onboardingFinished, [
                 "has_avatar": avatar != nil,
-                "interests_count": picked.count,
-                "city_id": cityID
+                "interests_count": picked.count
             ])
             return true
         } catch {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    // MARK: - Skip
+
+    /// Skip used to call the view's `onFinish` and nothing else — which read the
+    /// flag back out of the database, found `onboarded_at` still null, and put
+    /// the cover straight back up. The button did nothing at all.
+    ///
+    /// So it writes the one field that means "do not ask again", and no others:
+    /// skipping is a decision to keep the profile as it is, not to blank it.
+    ///
+    /// A failure is reported rather than swallowed. The screen cannot close
+    /// without that write landing, so a silent failure would look exactly like
+    /// the bug this replaces.
+    @discardableResult
+    func skip() async -> Bool {
+        guard let uid = supabase.auth.currentUser?.id.uuidString else { return false }
+
+        struct Skipped: Encodable {
+            let onboardedAt: String
+            enum CodingKeys: String, CodingKey { case onboardedAt = "onboarded_at" }
+        }
+
+        isSaving = true
+        defer { isSaving = false }
+
+        do {
+            try await supabase
+                .from("users")
+                .update(Skipped(onboardedAt: Self.now))
+                .eq("id", value: uid)
+                .execute()
+            UserPreferences.shared.markOnboarded(interests: [])
+            Analytics.track(.onboardingSkipped)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    private static var now: String {
+        ISO8601DateFormatter().string(from: Date())
     }
 }

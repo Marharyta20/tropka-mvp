@@ -129,6 +129,9 @@ extension Analytics {
         case routeWalked        = "route_walked"
         case routeUnwalked      = "route_unwalked"
         case onboardingFinished = "onboarding_finished"
+        // Worth its own event: a skip rate that climbs says the setup
+        // step is asking for something people do not want to give.
+        case onboardingSkipped  = "onboarding_skipped"
         case pushPermissionAnswered = "push_permission_answered"
         case pushOpened         = "push_opened"
         case routeMapOpened     = "route_map_opened"

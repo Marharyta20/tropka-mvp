@@ -27,6 +27,7 @@ struct AddToRoutePicker: View {
                 draftSection
                 existingSection
             }
+            .overlay(alignment: .bottom) { toast }
             .navigationTitle("Add to route")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -113,14 +114,23 @@ struct AddToRoutePicker: View {
                 .disabled(busyRouteID != nil)
             }
         }
-        .overlay(alignment: .bottom) {
-            if let message {
-                Text(message)
-                    .font(.caption)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: Capsule())
-            }
+    }
+
+    /// Confirmation that the tap did something. Appending writes straight to the
+    /// database with no save step, so without this the only feedback was a stop
+    /// count quietly changing by one.
+    @ViewBuilder
+    private var toast: some View {
+        if let message {
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.regularMaterial, in: Capsule())
+                .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
+                .padding(.bottom, 24)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
         }
     }
 
@@ -203,10 +213,14 @@ struct AddToRoutePicker: View {
     }
 
     private func show(_ text: String) {
-        message = text
+        withAnimation(.easeOut(duration: 0.2)) { message = text }
         Task {
             try? await Task.sleep(nanoseconds: 1_800_000_000)
-            if message == text { message = nil }
+            // Guarded: a second tap during the wait owns the toast now, and the
+            // first timer must not take it down early.
+            if message == text {
+                withAnimation(.easeIn(duration: 0.2)) { message = nil }
+            }
         }
     }
 }
