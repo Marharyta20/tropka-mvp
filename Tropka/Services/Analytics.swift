@@ -160,7 +160,6 @@ extension Analytics {
         case placesSearched         = "places_searched"
         case categoryOpened         = "category_opened"
         case placeLinkOpened        = "place_link_opened"
-        case exploreSectionSwitched = "explore_section_switched"
 
         // Map
         case mapSearched        = "map_searched"

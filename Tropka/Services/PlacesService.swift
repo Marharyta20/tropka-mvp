@@ -166,7 +166,87 @@ final class PlacesService {
             .single()
             .execute()
             .value
+        recordView(placeID: id)
         return Self.map(row)
+    }
+
+    // MARK: - Popularity
+
+    /// Counts an opening, and is deliberately unable to fail loudly.
+    ///
+    /// Every route into a place — the detail screen and the map sheet both — goes
+    /// through `details`, so this is the one place it needs to live. Detached
+    /// rather than awaited: a place opens whether or not a counter moves, and
+    /// making the screen wait on a statistic would be the tail wagging the dog.
+    ///
+    /// Nothing reads the totals yet. The point is that the column is filling up,
+    /// so that when "what people actually open" becomes part of picking the place
+    /// of the day, there is something to rank by instead of an empty table.
+    private func recordView(placeID: Int) {
+        Task.detached {
+            struct Params: Encodable {
+                let placeID: Int
+                enum CodingKeys: String, CodingKey { case placeID = "p_place_id" }
+            }
+            _ = try? await supabase
+                .rpc("record_place_view", params: Params(placeID: placeID))
+                .execute()
+        }
+    }
+
+    // MARK: - Near you
+
+    /// Listed places around a coordinate, nearest first.
+    ///
+    /// A bounding box and a sort in Swift rather than a distance query: that
+    /// would mean PostGIS or earthdistance for a box a few streets wide, and the
+    /// error a flat approximation makes over one kilometre in Warsaw is a couple
+    /// of metres — far below the point at which anyone would notice their
+    /// nearest café was the second nearest.
+    ///
+    /// Only places with a photo come back, filtered here rather than in the
+    /// query: this card is mostly photograph, and a grey rectangle at the top of
+    /// the home screen is worse than no card. Forty-odd rows are already in
+    /// memory by then, so a server-side null check would buy nothing.
+    func nearby(latitude: Double,
+                longitude: Double,
+                radiusMetres: Double = 1_500,
+                limit: Int = 60) async throws -> [PlaceDetails] {
+
+        let latitudeSpan = radiusMetres / 111_320
+        // Meridians converge, so a degree of longitude is shorter the further
+        // from the equator: at Warsaw's latitude about six tenths of a degree of
+        // latitude. Without this the box would be far too narrow east to west.
+        let longitudeSpan = radiusMetres / (111_320 * cos(latitude * .pi / 180))
+
+        let rows: [Row] = try await supabase
+            .from("places")
+            .select(Self.fullColumns)
+            .eq("is_listed", value: true)
+            .gte("lat", value: latitude - latitudeSpan)
+            .lte("lat", value: latitude + latitudeSpan)
+            .gte("lng", value: longitude - longitudeSpan)
+            .lte("lng", value: longitude + longitudeSpan)
+            .order("rating_score", ascending: false, nullsFirst: false)
+            .limit(limit)
+            .execute()
+            .value
+
+        return rows
+            .map(Self.map)
+            .filter { $0.photoURL != nil }
+            .sorted { left, right in
+                Self.metres(from: (latitude, longitude), to: left)
+                    < Self.metres(from: (latitude, longitude), to: right)
+            }
+    }
+
+    private static func metres(from origin: (lat: Double, lng: Double),
+                               to place: PlaceDetails) -> Double {
+        guard let lat = place.lat, let lng = place.lng else { return .greatestFiniteMagnitude }
+        let dLat = (lat - origin.lat) * 111_320
+        let dLng = (lng - origin.lng) * 111_320 * cos(origin.lat * .pi / 180)
+        return (dLat * dLat + dLng * dLng).squareRoot()
     }
 
     /// Public routes that include this place. Row level security keeps other

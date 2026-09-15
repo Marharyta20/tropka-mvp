@@ -156,10 +156,11 @@ struct MapboxMapView: UIViewRepresentable {
             pins.textHaloWidth = 1.4
             self.pins = pins
 
-            mapView.mapboxMap.onStyleLoaded.observeNext { [weak self, weak mapView] _ in
-                guard let mapView else { return }
-                // A style reload throws the import config away, so the
-                // preset has to be re-applied rather than assumed to be there.
+            // No local capture of the map: everything below reaches it through
+            // the coordinator's own weak reference, which is the same object.
+            mapView.mapboxMap.onStyleLoaded.observeNext { [weak self] _ in
+                // A style reload throws the import config away, so the preset
+                // has to be re-applied rather than assumed to be there.
                 self?.lighting.invalidate()
                 self?.applyLightPreset()
                 self?.render()

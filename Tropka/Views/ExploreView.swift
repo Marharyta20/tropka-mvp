@@ -1,26 +1,36 @@
+import CoreLocation
+import SDWebImageSwiftUI
 import SwiftUI
 
 struct ExploreView: View {
 
-    /// Routes are the curated itineraries; Places is the raw catalogue behind them.
-    /// The catalogue is by far the larger asset, so it gets equal billing here
-    /// rather than being reachable only by panning the map.
-    private enum Section: String, CaseIterable, Identifiable {
-        case routes, places
-        var id: String { rawValue }
-        var title: String { self == .routes ? "Routes" : "Places" }
-        var searchPrompt: String { self == .routes ? "Search routes" : "Search places" }
+    /// Where "All places" and a category tile both lead: the full catalogue,
+    /// pushed rather than switched to. The title is the only thing that differs,
+    /// and it doubles as the identity — two pushes of the same list would be the
+    /// same screen anyway.
+    private struct CatalogueRoute: Identifiable, Hashable {
+        let title: String
+        var id: String { title }
     }
 
     @StateObject private var vm = ExploreViewModel()
     @StateObject private var placesVM = PlacesFeedViewModel()
 
-    @State private var section: Section = .routes
     @State private var searchText = ""
     @State private var selectedTag: String?
     @State private var searchDebounce: Task<Void, Never>?
+    @State private var placeSearchDebounce: Task<Void, Never>?
     @State private var showNewRoute = false
     @State private var categoryCounts: [CategoryCount] = []
+    @State private var catalogue: CatalogueRoute?
+
+    /// Place results for the home search. A separate, lighter query rather than
+    /// `placesVM`: that view model belongs to the pushed catalogue and carries
+    /// its category filters, which have nothing to do with what was typed here.
+    @State private var placeResults: [PlacePick] = []
+
+    @State private var nearbyPlaces: [PlaceDetails] = []
+    @ObservedObject private var location = NearbyLocation.shared
     @ObservedObject private var preferences = UserPreferences.shared
 
     /// The tiles the user said they care about, first. Ordering only — every
@@ -66,6 +76,33 @@ struct ExploreView: View {
         return candidates[day % candidates.count]
     }
 
+    /// The place near you, rotated daily.
+    ///
+    /// Not simply the nearest: that is a lottery won by whatever happens to be
+    /// across the street, and it would be the same thing every day for anyone who
+    /// opens the app at home. The nearest handful are the candidates and the date
+    /// picks among them, so the card has a reason to differ tomorrow while still
+    /// being somewhere you could walk to now.
+    private var nearbyPick: PlaceDetails? {
+        let candidates = Array(nearbyPlaces.prefix(8))
+        guard !candidates.isEmpty else { return nil }
+        let day = Calendar.current.ordinality(of: .day, in: .era, for: Date()) ?? 0
+        return candidates[day % candidates.count]
+    }
+
+    private var nearbyPickDistance: Double? {
+        guard let pick = nearbyPick,
+              let here = location.coordinate,
+              let lat = pick.lat, let lng = pick.lng else { return nil }
+        let dLat = (lat - here.latitude) * 111_320
+        let dLng = (lng - here.longitude) * 111_320 * cos(here.latitude * .pi / 180)
+        return (dLat * dLat + dLng * dLng).squareRoot()
+    }
+
+    private var totalPlaceCount: Int {
+        categoryCounts.reduce(0) { $0 + $1.count }
+    }
+
     // Every tag present in the loaded routes
     var allTags: [String] {
         Set(vm.routes.flatMap { $0.tags }).sorted()
@@ -73,25 +110,14 @@ struct ExploreView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                switch section {
-                case .routes: routesSection
-                case .places: PlacesFeedView(vm: placesVM)
-                }
-            }
-            // The tab bar already says "Explore", so a large title would only
-            // repeat it and cost a whole band of vertical space. The section
-            // switch takes that slot instead, which also gives the "+" company
-            // in a row it used to occupy alone.
+            home
+            // Inline, so the bar stays one row: the name and the "+" sit in it
+            // together and the search field keeps the space a large title would
+            // have taken.
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Picker("", selection: $section) {
-                        ForEach(Section.allCases) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 200)
-                }
+                brandMark
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Analytics.track(.routeEditorOpened, [
@@ -105,38 +131,89 @@ struct ExploreView: View {
                     }
                 }
             }
-            // One system search field for both sections — it collapses on scroll,
-            // which is what actually buys the vertical space back.
+            // One field, searching both. There is no longer a control on screen
+            // saying which half you are in, so it cannot search only one of them.
             .searchable(text: $searchText,
                         placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: section.searchPrompt)
+                        prompt: "Search routes and places")
             .navigationDestination(isPresented: $showNewRoute) {
                 RouteEditorView(mode: .create) {
                     vm.loadRoutes()
                 }
             }
+            .navigationDestination(item: $catalogue) { route in
+                PlacesFeedView(vm: placesVM)
+                    .navigationTitle(route.title)
+                    .navigationBarTitleDisplayMode(.inline)
+                    // Its own field: the catalogue is a screen of its own now,
+                    // and the home search behind it has already been left behind.
+                    .searchable(text: $placesVM.query,
+                                placement: .navigationBarDrawer(displayMode: .always),
+                                prompt: "Search places")
+            }
         }
         .trackScreen("Explore")
         .onChange(of: searchText) { _, newValue in
-            // Scope semantics: the same query, applied to whichever section is open.
-            if section == .places { placesVM.query = newValue }
             scheduleRouteSearchEvent(newValue)
-        }
-        .onChange(of: section) { _, newValue in
-            if newValue == .places { placesVM.query = searchText }
-            Analytics.track(.exploreSectionSwitched, ["section": newValue.rawValue])
+            schedulePlaceSearch(newValue)
         }
         .task {
             if vm.routes.isEmpty { vm.loadRoutes() }
             if categoryCounts.isEmpty {
                 categoryCounts = (try? await PlacesService.shared.categoryCounts()) ?? []
             }
+            location.refreshIfNeeded()
+            // Both halves are needed. `onChange` covers the first fix of the
+            // session; this covers every visit after it, when the coordinate is
+            // already known and nothing is going to change.
+            if nearbyPlaces.isEmpty { await loadNearby() }
         }
+        .onChange(of: location.coordinate?.latitude) { _, _ in
+            Task { await loadNearby() }
+        }
+    }
+
+    // MARK: - Brand mark
+
+    /// The name, rather than a navigation title.
+    ///
+    /// A large title would be the system font in the system colour and would
+    /// collapse away on the first scroll — and the slot was empty anyway since
+    /// the segmented control left it.
+    ///
+    /// Set in the rounded bold the sign-in screen uses for the mark, and in the
+    /// same plain text colour it uses there. Not coral: coral is the error colour
+    /// in this app. Not blue either, because blue in iOS means "you can tap this"
+    /// and the name is not a button.
+    ///
+    /// Two branches for one reason: iOS 26 draws every toolbar item on a glass
+    /// capsule, which around a word rather than a control reads as a button
+    /// nobody can press. `sharedBackgroundVisibility` turns it off and does not
+    /// exist before 26, where there is no capsule to turn off.
+    @ToolbarContentBuilder
+    private var brandMark: some ToolbarContent {
+        if #available(iOS 26.0, *) {
+            ToolbarItem(placement: .topBarLeading) { brandMarkLabel }
+                .sharedBackgroundVisibility(.hidden)
+        } else {
+            ToolbarItem(placement: .topBarLeading) { brandMarkLabel }
+        }
+    }
+
+    private var brandMarkLabel: some View {
+        Text("Tropka")
+            .font(.system(size: 26, weight: .bold, design: .rounded))
+            .foregroundStyle(Color.primary)
+            // The toolbar proposes a width, and at this size the word does not
+            // fit it — so SwiftUI did what it does to any text too long for its
+            // box and truncated it to "T…". `fixedSize` takes the width the word
+            // actually needs.
+            .fixedSize()
+            .accessibilityAddTraits(.isHeader)
     }
 
     /// Debounced so we log one search per query, not one per keystroke.
     private func scheduleRouteSearchEvent(_ query: String) {
-        guard section == .routes else { return }
         searchDebounce?.cancel()
         guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         searchDebounce = Task {
@@ -149,20 +226,49 @@ struct ExploreView: View {
         }
     }
 
-    private func openCategory(_ category: PlaceCategory) {
+    /// Debounced too, and for a different reason: this one hits the network on
+    /// every keystroke otherwise.
+    private func schedulePlaceSearch(_ query: String) {
+        placeSearchDebounce?.cancel()
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count >= 2 else {
+            placeResults = []
+            return
+        }
+        placeSearchDebounce = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            let found = (try? await PlacesService.shared.search(query: trimmed, limit: 12)) ?? []
+            guard !Task.isCancelled else { return }
+            placeResults = found
+        }
+    }
+
+    private func loadNearby() async {
+        guard let here = location.coordinate else { return }
+        nearbyPlaces = (try? await PlacesService.shared.nearby(
+            latitude: here.latitude,
+            longitude: here.longitude
+        )) ?? []
+    }
+
+    private func openCatalogue(_ category: PlaceCategory?) {
         Analytics.track(.categoryOpened, [
-            "category": category.displayName,
+            "category": category?.displayName ?? "all",
             "source": "explore_home"
         ])
-        placesVM.categories = [category]
-        placesVM.query = searchText
-        section = .places
+        // The pushed list is a screen of its own, with its own search. Carrying
+        // the home query into it would silently filter a catalogue the user
+        // opened to browse.
+        placesVM.categories = category.map { [$0] } ?? []
+        placesVM.query = ""
+        catalogue = CatalogueRoute(title: category?.displayName ?? "All places")
     }
 
     // MARK: - Routes
 
     @ViewBuilder
-    private var routesSection: some View {
+    private var home: some View {
         if vm.isLoading && vm.routes.isEmpty {
             ProgressView("Loading…").frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let msg = vm.errorMessage {
@@ -170,30 +276,19 @@ struct ExploreView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
-                    // While searching the page becomes a result list — the hero
-                    // and the category row would only be in the way.
+                    // While searching the page becomes a result list — the two
+                    // hero cards and the category row would only be in the way.
                     if !isSearching, selectedTag == nil {
-                        if let featured = featuredRoute {
-                            NavigationLink {
-                                TourDetailsView(route: featured, source: .explore)
-                            } label: {
-                                FeaturedRouteCard(route: featured)
-                            }
-                            .buttonStyle(.plain)
-                            .simultaneousGesture(TapGesture().onEnded {
-                                Analytics.track(.routeOpened, [
-                                    "route_id": featured.id,
-                                    "route_title": featured.title,
-                                    "source": "explore_featured"
-                                ])
-                            })
-                            .padding(.horizontal, 16)
-                        }
-
+                        featuredSection
+                        nearbySection
                         categoriesSection
                     }
 
                     routesListSection
+
+                    if isSearching {
+                        placeResultsSection
+                    }
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 32)
@@ -201,6 +296,56 @@ struct ExploreView: View {
             .refreshable {
                 Analytics.track(.exploreRefreshed)
                 vm.loadRoutes()
+                await loadNearby()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var featuredSection: some View {
+        if let featured = featuredRoute {
+            NavigationLink {
+                TourDetailsView(route: featured, source: .explore)
+            } label: {
+                FeaturedRouteCard(route: featured)
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded {
+                Analytics.track(.routeOpened, [
+                    "route_id": featured.id,
+                    "route_title": featured.title,
+                    "source": "explore_featured"
+                ])
+            })
+            .padding(.horizontal, 16)
+        }
+    }
+
+    /// Absent rather than empty when there is no location or nothing is close.
+    /// A "near you" card that says "we don't know where you are" is worse than
+    /// the space it would occupy.
+    @ViewBuilder
+    private var nearbySection: some View {
+        if let pick = nearbyPick {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeader(title: "Place of the day",
+                              subtitle: "Worth a detour from where you are")
+                    .padding(.horizontal, 16)
+
+                NavigationLink {
+                    PlaceDetailView(placeID: pick.id, preloaded: pick)
+                } label: {
+                    NearbyPlaceCard(place: pick, metresAway: nearbyPickDistance)
+                }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded {
+                    Analytics.track(.placeOpened, [
+                        "place_id": pick.id,
+                        "place_name": pick.name,
+                        "source": "explore_place_of_the_day"
+                    ])
+                })
+                .padding(.horizontal, 16)
             }
         }
     }
@@ -213,9 +358,16 @@ struct ExploreView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
+                    // First, and before any category: the catalogue as a whole
+                    // used to be reachable only through the segmented control
+                    // that this screen no longer has.
+                    AllPlacesTile(count: totalPlaceCount) {
+                        openCatalogue(nil)
+                    }
+
                     ForEach(orderedCategoryCounts) { item in
                         CategoryTile(category: item.category, count: item.count) {
-                            openCategory(item.category)
+                            openCatalogue(item.category)
                         }
                     }
                 }
@@ -226,17 +378,22 @@ struct ExploreView: View {
 
     private var routesListSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if !isSearching {
-                SectionHeader(title: "All routes")
-                    .padding(.horizontal, 16)
-            }
+            SectionHeader(title: isSearching ? "Routes" : "All routes")
+                .padding(.horizontal, 16)
 
-            tagRow
+            if !isSearching {
+                tagRow
+            }
 
             LazyVStack(spacing: 20) {
                 ForEach(listedRoutes) { r in
                     NavigationLink(destination: TourDetailsView(route: r, source: .explore)) {
                         ExploreCard(route: r)
+                            .overlay(alignment: .topLeading) {
+                                if isSearching {
+                                    ResultKindBadge(isRoute: true).padding(10)
+                                }
+                            }
                     }
                     .buttonStyle(.plain)
                     .simultaneousGesture(TapGesture().onEnded {
@@ -256,11 +413,59 @@ struct ExploreView: View {
                     Text(isSearching ? "No routes match your search." : "No routes yet.")
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
+                        .padding(.vertical, isSearching ? 12 : 40)
                 }
             }
             .padding(.horizontal, 16)
             .animation(.default, value: listedRoutes)
+        }
+    }
+
+    // MARK: - Places in search
+
+    /// The other half of the result list.
+    ///
+    /// Places are far more numerous than routes, so they go second: putting the
+    /// twelve strongest place matches above the two route matches would bury the
+    /// thing this app is actually for.
+    private var placeResultsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "Places")
+                .padding(.horizontal, 16)
+
+            LazyVStack(spacing: 0) {
+                ForEach(placeResults) { place in
+                    NavigationLink {
+                        PlaceDetailView(placeID: place.id)
+                    } label: {
+                        PlaceResultRow(place: place)
+                    }
+                    .buttonStyle(.plain)
+                    .simultaneousGesture(TapGesture().onEnded {
+                        Analytics.track(.placeOpened, [
+                            "place_id": place.id,
+                            "place_name": place.name,
+                            "source": "explore_search"
+                        ])
+                    })
+
+                    Divider().padding(.leading, 74)
+                }
+
+                if placeResults.isEmpty {
+                    Text("No places match your search.")
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+            }
+            .padding(.horizontal, 16)
+
+            if !placeResults.isEmpty {
+                Button("See the whole catalogue") { openCatalogue(nil) }
+                    .font(.footnote)
+                    .padding(.horizontal, 16)
+            }
         }
     }
 
@@ -295,6 +500,53 @@ struct ExploreView: View {
             }
             .padding(.horizontal, 16)
         }
+    }
+}
+
+// MARK: - Chip
+
+/// A place in the search results: compact, because twelve of these sit under
+/// the route cards and each one only has to be recognisable enough to tap.
+private struct PlaceResultRow: View {
+    let place: PlacePick
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                if let url = place.photoURL {
+                    WebImage(url: url) { $0.resizable().scaledToFill() }
+                        placeholder: { Color(.systemGray5) }
+                } else {
+                    Color(.systemGray5)
+                        .overlay(
+                            Image(systemName: place.category.icon)
+                                .foregroundColor(.secondary)
+                        )
+                }
+            }
+            .frame(width: 50, height: 50)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(place.name)
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+
+                if let address = place.address, !address.isEmpty {
+                    Text(address)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            ResultKindBadge(isRoute: false)
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
     }
 }
 
